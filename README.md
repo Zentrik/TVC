@@ -9,4 +9,4 @@ https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg
 
 https://www.youtube.com/user/ControlLectures/videos
 
-https://www.youtube.com/watch?v=wkfEZmsQqiA&t=29s
+https://youtu.be/wkfEZmsQqiA
