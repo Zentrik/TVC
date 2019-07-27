@@ -18,8 +18,8 @@ float pitchOld = 0.0;
 float yawOld = 0.0;
 double rollAngle, pitchAngle, yawAngle;
 
-float rollCalibrationValue = -160.27;
-float pitchCalibrationValue = -6.71;
+float rollCalibrationValue = -164.63;
+float pitchCalibrationValue = -20.63;
 float yawCalibrationValue = 60.02;
 
 SimpleKalmanFilter rollKalmanFilter(1, 1, 0.01);
@@ -35,7 +35,8 @@ unsigned long previousMillis = 0;
 unsigned long previousMillisGyro = 0;
 unsigned long previousMillisBaro = 0;
 const int interval = 20;    //20ms = 1/50Hz
-const int intervalGyro = 4; //20ms = 1/50Hz
+const int intervalGyro = 4; 
+const int intervalGyroAverage = 20;
 const int intervalBaro = 500;
 
 double MOI = 0.09010865521; //time period squared * string-COM squared * weight/ 4pi squared / string length
@@ -58,6 +59,7 @@ const double Ki = 0.206393482611663;
 const double N = 36.46824066771;
 
 void gyro();
+void gyroAverage();
 void PIDy(double errorAngle);
 void PIDx(double errorAngle);
 
@@ -125,17 +127,18 @@ void loop() {
     Serial.print(yawAngle, 5); //print gyro values
     Serial.print("\n"); */
 
+    gyroAverage();
     PIDx(rollAngle);
     PIDy(pitchAngle);
 
 
-    //Serial.print(x);
-    //Serial.print("\t");
-    Serial.print(rollAngle / PI * 180,5);
+    Serial.print(x);
     Serial.print("\t");
-    //Serial.print(y);
-    //Serial.print("\t");
-    Serial.print(pitchAngle / PI * 180,5);
+    Serial.print(rollAngle,5);
+    Serial.print("\t");
+    Serial.print(y);
+    Serial.print("\t");
+    Serial.print(pitchAngle,5);
     Serial.print("\n");
 
     //servop.write(x);
@@ -166,9 +169,8 @@ void gyro() {
 
   //65.5 = 1 deg/sec (check the datasheet of the MPU-6050 for more information).
   //rollNew = (rollOld * 0.7) + ((((float)roll - rollCalibrationValue)/ 65.5) * 0.3);   //Gyro pid input is deg/sec.
-  rollNew = rollKalmanFilter.updateEstimate((roll - rollCalibrationValue) / 65.5);
-  pitchNew = pitchKalmanFilter.updateEstimate((pitch - pitchCalibrationValue) / 65.5); //Gyro pid input is deg/sec.
-  yawNew = yawKalmanFilter.updateEstimate((yaw - yawCalibrationValue) / 65.5);         //Gyro pid input is deg/sec.
+  rollNew += (roll - rollCalibrationValue) / 65.5;
+  pitchNew += (pitch - pitchCalibrationValue) / 65.5; //Gyro pid input is deg/sec.
 
   /* if (abs(rollNew) <= 0.2) {
     rollNew = 0;
@@ -191,16 +193,38 @@ void gyro() {
   angle_roll += angle_pitch * sin((float)gyro_yaw * 0.000001066);*/
   //If the IMU has yawed transfer the pitch angle to the roll angel.
 
-  pitchAngle += (pitchNew + pitchOld) * (intervalGyro * PI / 360000);                                    //Calculate the traveled pitch angle and add this to the angle_pitch variable.
-  rollAngle += (rollNew + rollOld) * (intervalGyro * PI / 360000);                                 //Calculate the traveled roll angle and add this to the angle_roll variable.
-  yawAngle += (yawNew + yawOld) * (intervalGyro * PI / 360000);
+  //pitchAngle += (pitchNew + pitchOld) * (intervalGyro * PI / 360000);                                    //Calculate the traveled pitch angle and add this to the angle_pitch variable.
+  //rollAngle += (rollNew + rollOld) * (intervalGyro * PI / 360000);                                 //Calculate the traveled roll angle and add this to the angle_roll variable.
 
+  //rollOld = rollNew;
+  //pitchOld = pitchNew;
+}
+
+void gyroAverage() {
+  rollNew = rollNew / (intervalGyroAverage / intervalGyro);
+  rollAngle += (rollNew + rollOld) * intervalGyroAverage / 2000;
+  if (rollAngle > 180) {
+    rollAngle -= 360;
+  } else if (rollAngle < -180) {
+    rollAngle += 360;
+  }
   rollOld = rollNew;
+  rollNew = 0;
+
+  pitchNew = pitchNew / (intervalGyroAverage / intervalGyro);
+  pitchAngle += (pitchNew + pitchOld) * intervalGyroAverage / 2000;
+  //pitchAngle = fmod(pitchAngle,180);
+  if (pitchAngle > 180) {
+    pitchAngle -= 360;
+  } else if (pitchAngle < -180) {
+    pitchAngle += 360;
+  }
   pitchOld = pitchNew;
-  yawOld = yawNew;
+  pitchNew = 0;
 }
 
 void PIDy(double errorAngle) {
+    errorAngle = errorAngle * PI / 180;
     FilterCoefficient = (Kd * errorAngle - Filter_DSTATE) * N;
     y = (Kp * errorAngle + Integrator_DSTATE) + FilterCoefficient;
     Integrator_DSTATE += Ki * errorAngle * interval / 1000;
@@ -210,10 +234,16 @@ void PIDy(double errorAngle) {
 }
 
 void PIDx(double errorAngle) {
+    errorAngle = errorAngle * PI / 180;
     FilterCoefficientx = (Kd * errorAngle - Filter_DSTATEx) * N;
     x = (Kp * errorAngle + Integrator_DSTATEx) + FilterCoefficientx;
     Integrator_DSTATEx += Ki * errorAngle * interval / 1000;
     Filter_DSTATEx += interval / 1000 * FilterCoefficientx;
 
     x = asin(sin(x) * MaxThrust / Thrust) / PI * 180;
+    if (x > 10) {
+      x = 10;
+    } else if (x < -10) {
+      x = -10;
+    }
 }
