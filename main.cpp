@@ -43,20 +43,31 @@ double MOI = 0.09010865521; //time period squared * string-COM squared * weight/
 int Thrust = 25;
 int MaxThrust = 25;
 
-double Integrator_DSTATE = 0;
-double Filter_DSTATE = 0;
+const double PIDTVCAngle_P = 0.0444910192906637;
+const double PIDTVCAngle_D = 0.00251899563332339;
+const double PIDTVCAngle_I = 0.170401833942346;
+const double PIDTVCAngle_N = 91.5676010079333;
+const int Constant_Value = 1;
+const float TSamp_WtEt = 0.01;
+const int FilterDifferentiatorTF_InitialS = 0;
+const float Integrator_gainval = 0.1;
+const int Integrator_IC = 0;
+const int FilterDifferentiatorTF_NumCoef0 = 1;
+const int FilterDifferentiatorTF_NumCoef1 = -1;
+
+/* InitializeConditions for DiscreteTransferFcn: '<S2>/Filter Differentiator TF' */
+double FilterDifferentiatorTF_statesy = FilterDifferentiatorTF_InitialS;
+/* InitializeConditions for DiscreteIntegrator: '<S1>/Integrator' */
+double Integrator_DSTATEy = Integrator_IC;
 double y = 0;
-double FilterCoefficient = 0;
 
-double Integrator_DSTATEx = 0;
-double Filter_DSTATEx = 0;
+double FilterDifferentiatorTF_statesx = FilterDifferentiatorTF_InitialS;
+double Integrator_DSTATEx = Integrator_IC;
+double rtb_FilterDifferentiatorTFx;
+double rtb_Sumx;
+double Integrator_tmpx;
+double Integratorx;
 double x = 0;
-double FilterCoefficientx = 0;
-
-const double Kp = 0.382662534441352;
-const double Kd = 0.139903294226043;
-const double Ki = 0.206393482611663;
-const double N = 36.46824066771;
 
 void gyro();
 void gyroAverage();
@@ -223,7 +234,7 @@ void gyroAverage() {
   pitchNew = 0;
 }
 
-void PIDy(double errorAngle) {
+/*void PIDy(double errorAngle) {
     errorAngle = errorAngle * PI / 180;
     FilterCoefficient = (Kd * errorAngle - Filter_DSTATE) * N;
     y = (Kp * errorAngle + Integrator_DSTATE) + FilterCoefficient;
@@ -231,14 +242,22 @@ void PIDy(double errorAngle) {
     Filter_DSTATE += interval / 1000 * FilterCoefficient;
 
     y = asin(sin(y) * MaxThrust / Thrust) / PI * 180;
-}
+}*/
 
 void PIDx(double errorAngle) {
-    errorAngle = errorAngle * PI / 180;
-    FilterCoefficientx = (Kd * errorAngle - Filter_DSTATEx) * N;
-    x = (Kp * errorAngle + Integrator_DSTATEx) + FilterCoefficientx;
-    Integrator_DSTATEx += Ki * errorAngle * interval / 1000;
-    Filter_DSTATEx += interval / 1000 * FilterCoefficientx;
+    errorAngle = errorAngle / 180 * PI; //degrees to rads
+    
+    rtb_FilterDifferentiatorTFx = PIDTVCAngle_N * TSamp_WtEt;
+    rtb_Sumx = 1.0 / (Constant_Value + rtb_FilterDifferentiatorTFx);
+    rtb_FilterDifferentiatorTFx = PIDTVCAngle_D * errorAngle - (rtb_FilterDifferentiatorTFx - Constant_Value) * rtb_Sumx * FilterDifferentiatorTF_statesx;
+    Integrator_tmpx = Integrator_gainval * (PIDTVCAngle_I * errorAngle);
+    Integratorx = Integrator_tmpx + Integrator_DSTATEx;
+    x = (FilterDifferentiatorTF_NumCoef0 * rtb_FilterDifferentiatorTFx + FilterDifferentiatorTF_NumCoef1 * FilterDifferentiatorTF_statesx) * rtb_Sumx * PIDTVCAngle_N + (PIDTVCAngle_P * errorAngle + Integratorx);
+
+    /* Update for DiscreteTransferFcn: '<S2>/Filter Differentiator TF' */
+    FilterDifferentiatorTF_statesx = rtb_FilterDifferentiatorTFx; 
+    /* Update for DiscreteIntegrator: '<S1>/Integrator' */
+    Integrator_DSTATEx = Integrator_tmpx + Integratorx;
 
     x = asin(sin(x) * MaxThrust / Thrust) / PI * 180;
     if (x > 10) {
