@@ -12,21 +12,18 @@ Servo servoy;
 
 int16_t roll, pitch, yaw; //16bit signed integers, needs to be 16 bit as that is the output of MPU6050
 
-float rollNew, pitchNew, yawNew;
+float rollNew, pitchNew;
 float rollOld = 0.0;
 float pitchOld = 0.0;
-float yawOld = 0.0;
-double rollAngle, pitchAngle, yawAngle;
+double rollAngle, pitchAngle;
 
 float rollCalibrationValue = -164.63;
 float pitchCalibrationValue = -20.63;
-float yawCalibrationValue = 60.02;
 
 SimpleKalmanFilter rollKalmanFilter(1, 1, 0.01);
 SimpleKalmanFilter pitchKalmanFilter(1, 1, 0.01);
-SimpleKalmanFilter yawKalmanFilter(1, 1, 0.01);
 
-#define LED_PIN 32 // (Arduino is 13, Teensy is 11, Teensy++ is 6) PC13 is 32
+#define LED_PIN PC13 // (Arduino is 13, Teensy is 11, Teensy++ is 6) PC13 is 32
 bool blinkState = true;
 #define gyro_address 0x68
 
@@ -36,7 +33,7 @@ unsigned long previousMillisGyro = 0;
 unsigned long previousMillisBaro = 0;
 const int interval = 20;    //20ms = 1/50Hz
 const int intervalGyro = 4; 
-const int intervalGyroAverage = 20;
+const int intervalGyroAverage = interval;
 const int intervalBaro = 500;
 
 double MOI = 0.09010865521; //time period squared * string-COM squared * weight/ 4pi squared / string length
@@ -59,6 +56,10 @@ const int FilterDifferentiatorTF_NumCoef1 = -1;
 double FilterDifferentiatorTF_statesy = FilterDifferentiatorTF_InitialS;
 /* InitializeConditions for DiscreteIntegrator: '<S1>/Integrator' */
 double Integrator_DSTATEy = Integrator_IC;
+double rtb_FilterDifferentiatorTFy;
+double rtb_Sumy;
+double Integrator_tmpy;
+double Integratory;
 double y = 0;
 
 double FilterDifferentiatorTF_statesx = FilterDifferentiatorTF_InitialS;
@@ -106,10 +107,10 @@ void setup() {
   //servop.attach(PA0);
   //servoy.attach(PA1);
 
-  /*if (!bmp.begin()) {
+  if (!bmp.begin()) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
     while (1);
-  }*/
+  }
 
   /* Default settings from datasheet. */
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
@@ -128,20 +129,11 @@ void loop() {
   }
 
   if (currentMillis - previousMillis >= interval) {
-    // save the last time you blinked the LED
-    previousMillis = currentMillis;
-
-    /* Serial.print(rollAngle,5);
-    Serial.print("\t");
-    Serial.print(pitchAngle, 5);
-    Serial.print("\t");
-    Serial.print(yawAngle, 5); //print gyro values
-    Serial.print("\n"); */
-
+    previousMillis = currentMillis; // save the last time you blinked the LED
+    
     gyroAverage();
     PIDx(rollAngle);
     PIDy(pitchAngle);
-
 
     Serial.print(x);
     Serial.print("\t");
@@ -154,18 +146,17 @@ void loop() {
 
     //servop.write(x);
     //servoy.write(y);
+  }
 
+  if (currentMillis - previousMillisBaro >= intervalBaro) {
+    previousMillisBaro = currentMillis;
+    //Serial.println(bmp.readAltitude(sealevel));
     if (blinkState) { //if true turn off, if false turn on
       digitalWrite(LED_PIN, LOW);
     } else {
       digitalWrite(LED_PIN, HIGH);
     }
     blinkState = !blinkState; //invert blinkstate
-  }
-
-  if (currentMillis - previousMillisBaro >= intervalBaro) {
-    previousMillisBaro = currentMillis;
-    //Serial.println(bmp.readAltitude(sealevel));
   }
 }
 
@@ -179,41 +170,14 @@ void gyro() {
   yaw = Wire.read() << 8 | Wire.read();   //shift high byte left and add low and high byte to Z
 
   //65.5 = 1 deg/sec (check the datasheet of the MPU-6050 for more information).
-  //rollNew = (rollOld * 0.7) + ((((float)roll - rollCalibrationValue)/ 65.5) * 0.3);   //Gyro pid input is deg/sec.
   rollNew += (roll - rollCalibrationValue) / 65.5;
   pitchNew += (pitch - pitchCalibrationValue) / 65.5; //Gyro pid input is deg/sec.
-
-  /* if (abs(rollNew) <= 0.2) {
-    rollNew = 0;
-  }
-  if (abs(pitchNew) <= 0.2) {
-    pitchNew = 0;
-  }
-  if (abs(yawNew) <= 0.2) {
-    yawNew = 0;
-  } */
-
-  /* Gyro angle calculations
-  //T = 0.004 = (1/250Hz), trapezium area is (new + old)/2 * T
-  rollAngle += (rollNew + rollOld) * 0.002;    //Calculate the traveled roll angle and add this to the angle_roll variable.
-  pitchAngle += (pitchNew + pitchOld) * 0.002; //Calculate the traveled pitch angle and add this to the angle_pitch variable.
-  yawAngle += (yawNew + yawOld) * 0.002;*/
-
-  /*0.000001066 = 0.0000611 * (3.142(PI) / 180degr) The Arduino sin function is in radians and not degrees.
-  angle_pitch -= angle_roll * sin((float)gyro_yaw * 0.000001066);                  //If the IMU has yawed transfer the roll angle to the pitch angel.
-  angle_roll += angle_pitch * sin((float)gyro_yaw * 0.000001066);*/
-  //If the IMU has yawed transfer the pitch angle to the roll angel.
-
-  //pitchAngle += (pitchNew + pitchOld) * (intervalGyro * PI / 360000);                                    //Calculate the traveled pitch angle and add this to the angle_pitch variable.
-  //rollAngle += (rollNew + rollOld) * (intervalGyro * PI / 360000);                                 //Calculate the traveled roll angle and add this to the angle_roll variable.
-
-  //rollOld = rollNew;
-  //pitchOld = pitchNew;
 }
 
 void gyroAverage() {
-  rollNew = rollNew / (intervalGyroAverage / intervalGyro);
+  rollNew = rollKalmanFilter.updateEstimate(rollNew / (intervalGyroAverage / intervalGyro));
   rollAngle += (rollNew + rollOld) * intervalGyroAverage / 2000;
+
   if (rollAngle > 180) {
     rollAngle -= 360;
   } else if (rollAngle < -180) {
@@ -224,7 +188,6 @@ void gyroAverage() {
 
   pitchNew = pitchNew / (intervalGyroAverage / intervalGyro);
   pitchAngle += (pitchNew + pitchOld) * intervalGyroAverage / 2000;
-  //pitchAngle = fmod(pitchAngle,180);
   if (pitchAngle > 180) {
     pitchAngle -= 360;
   } else if (pitchAngle < -180) {
@@ -244,6 +207,33 @@ void gyroAverage() {
     y = asin(sin(y) * MaxThrust / Thrust) / PI * 180;
 }*/
 
+void PIDy(double errorAngle) {
+    errorAngle = errorAngle / 180 * PI; //degrees to rads
+    
+    rtb_FilterDifferentiatorTFy = PIDTVCAngle_N * TSamp_WtEt;
+    rtb_Sumy = 1.0 / (Constant_Value + rtb_FilterDifferentiatorTFy);
+    rtb_FilterDifferentiatorTFy = PIDTVCAngle_D * errorAngle - (rtb_FilterDifferentiatorTFy - Constant_Value) * rtb_Sumy * FilterDifferentiatorTF_statesy;
+    Integrator_tmpy = Integrator_gainval * (PIDTVCAngle_I * errorAngle);
+    Integratory = Integrator_tmpy + Integrator_DSTATEy;
+    y = (FilterDifferentiatorTF_NumCoef0 * rtb_FilterDifferentiatorTFy + FilterDifferentiatorTF_NumCoef1 * FilterDifferentiatorTF_statesy) * rtb_Sumy * PIDTVCAngle_N + (PIDTVCAngle_P * errorAngle + Integratory);
+
+    /* Update for DiscreteTransferFcn: '<S2>/Filter Differentiator TF' */
+    FilterDifferentiatorTF_statesy = rtb_FilterDifferentiatorTFy; 
+    /* Update for DiscreteIntegrator: '<S1>/Integrator' */
+    Integrator_DSTATEy = Integrator_tmpy + Integratory;
+
+    if (y < 0.174532925199433 || y > -0.174532925199433) { // if y > -10 or y < 10. 10 degress = 0.174532925199433 radians. This prevents y > pi/2 when sin(y) would start decreasing
+      y = asin(sin(y) * MaxThrust / Thrust);
+    } 
+   
+    y = y / PI * 180;
+    if (y > 10) {
+      y = 10;
+    } else if (y < -10) {
+      y = -10;
+    }  
+}
+
 void PIDx(double errorAngle) {
     errorAngle = errorAngle / 180 * PI; //degrees to rads
     
@@ -259,10 +249,14 @@ void PIDx(double errorAngle) {
     /* Update for DiscreteIntegrator: '<S1>/Integrator' */
     Integrator_DSTATEx = Integrator_tmpx + Integratorx;
 
-    x = asin(sin(x) * MaxThrust / Thrust) / PI * 180;
+    if (x < 0.174532925199433 || x > -0.174532925199433) { // if x > -10 or x < 10. 10 degress = 0.174532925199433 radians. This prevents x > pi/2 when sin(x) would start decreasing
+      x = asin(sin(x) * MaxThrust / Thrust);
+    } 
+   
+    x = x / PI * 180;
     if (x > 10) {
       x = 10;
     } else if (x < -10) {
       x = -10;
-    }
+    }  
 }
