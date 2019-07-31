@@ -5,45 +5,51 @@
 #include <Adafruit_BMP280.h>
 
 Adafruit_BMP280 bmp; // I2C
-const int sealevel = 1027;
+const int sealevel = 1027; //current sea pressure
 
-Servo servop;
+Servo servox; //initialise servos for x and y axis (pitch and yaw)  
 Servo servoy;
 
 int16_t roll, pitch, yaw; //16bit signed integers, needs to be 16 bit as that is the output of MPU6050
 
-float rollNew, pitchNew;
-float rollOld = 0.0;
+float rollNew, pitchNew, yawNew; //declare variable that will hold current gyro values
+float rollOld = 0.0; //initialise variable that hold old gyro values
 float pitchOld = 0.0;
-double rollAngle, pitchAngle;
+float yawOld = 0.0;
+double rollAngle, pitchAngle, yawAngle; //declare variable that holds current angle, integrated from angular velocity measurement from gyro
 
-float rollCalibrationValue = -164.63;
+float rollCalibrationValue = -164.63; //offset gyro readings so when no movement reading is near 0
 float pitchCalibrationValue = -20.63;
+float yawCalibrationValue = 0.0;
 
-SimpleKalmanFilter rollKalmanFilter(1, 1, 0.01);
+SimpleKalmanFilter rollKalmanFilter(1, 1, 0.01); //reduces noise in gyro readings
 SimpleKalmanFilter pitchKalmanFilter(1, 1, 0.01);
+SimpleKalmanFilter yawKalmanFilter(1, 1, 0.01);
 
 #define LED_PIN PC13 // (Arduino is 13, Teensy is 11, Teensy++ is 6) PC13 is 32
-bool blinkState = true;
+bool blinkState = true; //holds current led status
 #define gyro_address 0x68
 
-unsigned long currentMillis;
-unsigned long previousMillis = 0;
-unsigned long previousMillisGyro = 0;
-unsigned long previousMillisBaro = 0;
-const int interval = 20;    //20ms = 1/50Hz
-const int intervalGyro = 4; 
-const int intervalGyroAverage = interval;
-const int intervalBaro = 500;
+unsigned long currentMillis; //declare variable that stores the current time
+unsigned long previousMillis = 0; //initialise variable that stores time since last PID loop and servo update
+unsigned long previousMillisGyro = 0; //initialise variable that stores time since last gyro read
+unsigned long previousMillisBaro = 0; //initialise variable that stores time since last barometer read
+const int interval = 20;    //20ms = 1/50Hz, frequency of servo
+const int intervalGyro = 4; //250Hz, gyro read rate
+const int intervalGyroAverage = interval; //gyro reading average rate
+const int intervalBaro = 500; //barometer read rate
 
 double MOI = 0.09010865521; //time period squared * string-COM squared * weight/ 4pi squared / string length
-int Thrust = 25;
-int MaxThrust = 25;
+int Thrust = 25; //current thrust of motor
+int MaxThrust = 25; //maximum thrust of motor
 
-const double PIDTVCAngle_P = 0.0444910192906637;
+//PID Values, tune with max thrust
+const double PIDTVCAngle_P = 0.0444910192906637; 
 const double PIDTVCAngle_D = 0.00251899563332339;
 const double PIDTVCAngle_I = 0.170401833942346;
 const double PIDTVCAngle_N = 91.5676010079333;
+
+//PID Values, maybe they are constants and never need changing I dont know
 const int Constant_Value = 1;
 const float TSamp_WtEt = 0.01;
 const int FilterDifferentiatorTF_InitialS = 0;
@@ -52,6 +58,7 @@ const int Integrator_IC = 0;
 const int FilterDifferentiatorTF_NumCoef0 = 1;
 const int FilterDifferentiatorTF_NumCoef1 = -1;
 
+// PID Values for Y axis
 /* InitializeConditions for DiscreteTransferFcn: '<S2>/Filter Differentiator TF' */
 double FilterDifferentiatorTF_statesy = FilterDifferentiatorTF_InitialS;
 /* InitializeConditions for DiscreteIntegrator: '<S1>/Integrator' */
@@ -60,16 +67,19 @@ double rtb_FilterDifferentiatorTFy;
 double rtb_Sumy;
 double Integrator_tmpy;
 double Integratory;
-double y = 0;
+double y = 0; //how much to rotate servo by
 
+
+// PID Values for Y axis
 double FilterDifferentiatorTF_statesx = FilterDifferentiatorTF_InitialS;
 double Integrator_DSTATEx = Integrator_IC;
 double rtb_FilterDifferentiatorTFx;
 double rtb_Sumx;
 double Integrator_tmpx;
 double Integratorx;
-double x = 0;
+double x = 0; //how much to rotate servo by
 
+//Function declarations
 void gyro();
 void gyroAverage();
 void PIDy(double errorAngle);
@@ -104,7 +114,7 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT); //setup LED as output
 
-  //servop.attach(PA0);
+  //servop.attach(PA0); // attach servos
   //servoy.attach(PA1);
 
   if (!bmp.begin()) {
@@ -121,27 +131,27 @@ void setup() {
 }
 
 void loop() {
-  currentMillis = millis();
+  currentMillis = millis(); //set variable to current time in milliseconds
 
   if (currentMillis - previousMillisGyro >= intervalGyro) {
-    previousMillisGyro = currentMillis;
-    gyro();
+    previousMillisGyro = currentMillis; //so currentMillis - previousMillisGyro is now 0
+    gyro(); //read gyro values
   }
 
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis; // save the last time you blinked the LED
     
     gyroAverage();
-    PIDx(rollAngle);
-    PIDy(pitchAngle);
+    PIDx(rollAngle);        //pass x axis rotation into pid function
+    PIDy(pitchAngle);       //pass y axis rotation into pid function
 
-    Serial.print(x);
+    Serial.print(x);            //pid output for x axis
     Serial.print("\t");
-    Serial.print(rollAngle,5);
+    Serial.print(rollAngle,5);  //x axis rotation
     Serial.print("\t");
-    Serial.print(y);
+    Serial.print(y);            //pid output for y axis
     Serial.print("\t");
-    Serial.print(pitchAngle,5);
+    Serial.print(pitchAngle,5); //y axis rotation
     Serial.print("\n");
 
     //servop.write(x);
@@ -150,7 +160,8 @@ void loop() {
 
   if (currentMillis - previousMillisBaro >= intervalBaro) {
     previousMillisBaro = currentMillis;
-    //Serial.println(bmp.readAltitude(sealevel));
+    //Serial.println(bmp.readAltitude(sealevel)); //read altitude from barometer using current sea pressure
+
     if (blinkState) { //if true turn off, if false turn on
       digitalWrite(LED_PIN, LOW);
     } else {
@@ -169,43 +180,33 @@ void gyro() {
   pitch = Wire.read() << 8 | Wire.read(); //shift high byte left and add low and high byte to Y
   yaw = Wire.read() << 8 | Wire.read();   //shift high byte left and add low and high byte to Z
 
-  //65.5 = 1 deg/sec (check the datasheet of the MPU-6050 for more information).
-  rollNew += (roll - rollCalibrationValue) / 65.5;
-  pitchNew += (pitch - pitchCalibrationValue) / 65.5; //Gyro pid input is deg/sec.
+  rollNew += (roll - rollCalibrationValue) / 65.5;      //65.5 = 1 deg/sec (check the datasheet of the MPU-6050 for more information).
+  pitchNew += (pitch - pitchCalibrationValue) / 65.5;   //to average them
 }
 
 void gyroAverage() {
-  rollNew = rollKalmanFilter.updateEstimate(rollNew / (intervalGyroAverage / intervalGyro));
-  rollAngle += (rollNew + rollOld) * intervalGyroAverage / 2000;
+  rollNew = rollKalmanFilter.updateEstimate(rollNew / (intervalGyroAverage / intervalGyro));    //average gyro readings and then pass into kalman filter
+  rollAngle += (rollNew + rollOld) * intervalGyroAverage / 2000;        //trapezoidal integral
 
-  if (rollAngle > 180) {
-    rollAngle -= 360;
+  if (rollAngle > 180) {            //constrain angle to be between -180 to + 180
+    rollAngle -= 360;               //if angle is 190 it becomes -170
   } else if (rollAngle < -180) {
-    rollAngle += 360;
+    rollAngle += 360;               //if angle is -190 it becomes 170
   }
   rollOld = rollNew;
   rollNew = 0;
 
-  pitchNew = pitchNew / (intervalGyroAverage / intervalGyro);
-  pitchAngle += (pitchNew + pitchOld) * intervalGyroAverage / 2000;
-  if (pitchAngle > 180) {
-    pitchAngle -= 360;
+  pitchNew = pitchKalmanFiter.updateEstimate(pitchNew / (intervalGyroAverage / intervalGyro);   //average gyro readings and then pass into kalman filter
+  pitchAngle += (pitchNew + pitchOld) * intervalGyroAverage / 2000;     //trapezoidal integral
+
+  if (pitchAngle > 180) {           //constrain angle to be between -180 to + 180
+    pitchAngle -= 360;              //if angle is 190 it becomes -170
   } else if (pitchAngle < -180) {
-    pitchAngle += 360;
+    pitchAngle += 360;              //if angle is -190 it becomes 170
   }
   pitchOld = pitchNew;
   pitchNew = 0;
 }
-
-/*void PIDy(double errorAngle) {
-    errorAngle = errorAngle * PI / 180;
-    FilterCoefficient = (Kd * errorAngle - Filter_DSTATE) * N;
-    y = (Kp * errorAngle + Integrator_DSTATE) + FilterCoefficient;
-    Integrator_DSTATE += Ki * errorAngle * interval / 1000;
-    Filter_DSTATE += interval / 1000 * FilterCoefficient;
-
-    y = asin(sin(y) * MaxThrust / Thrust) / PI * 180;
-}*/
 
 void PIDy(double errorAngle) {
     errorAngle = errorAngle / 180 * PI; //degrees to rads
@@ -222,14 +223,14 @@ void PIDy(double errorAngle) {
     /* Update for DiscreteIntegrator: '<S1>/Integrator' */
     Integrator_DSTATEy = Integrator_tmpy + Integratory;
 
-    if (y < 0.174532925199433 || y > -0.174532925199433) { // if y > -10 or y < 10. 10 degress = 0.174532925199433 radians. This prevents y > pi/2 when sin(y) would start decreasing
-      y = asin(sin(y) * MaxThrust / Thrust);
+    if (y < 0.174532925199433 || y > -0.174532925199433) {  // if y > -10 or y < 10. 10 degress = 0.174532925199433 radians. This prevents y > pi/2 when sin(y) would start decreasing
+      y = asin(sin(y) * MaxThrust / Thrust);                //scale y so that sin(y) is increased linearly depending on MaxThrust / Thrust. This means the applied moment should stay the same as long as thrust isn't too small that y > 10 or y < -10.
     } 
    
-    y = y / PI * 180;
-    if (y > 10) {
+    y = y / PI * 180;       //convert x from radians to degress
+    if (y > 10) {           //if greater than 10, x = 10
       y = 10;
-    } else if (y < -10) {
+    } else if (y < -10) {   //if less than -10, x = -10
       y = -10;
     }  
 }
@@ -250,13 +251,13 @@ void PIDx(double errorAngle) {
     Integrator_DSTATEx = Integrator_tmpx + Integratorx;
 
     if (x < 0.174532925199433 || x > -0.174532925199433) { // if x > -10 or x < 10. 10 degress = 0.174532925199433 radians. This prevents x > pi/2 when sin(x) would start decreasing
-      x = asin(sin(x) * MaxThrust / Thrust);
+      x = asin(sin(x) * MaxThrust / Thrust); //scale x so that sin(x) is increased linearly depending on MaxThrust / Thrust. This means the applied moment should stay the same as long as thrust isn't too small that x > 10 or x < -10.
     } 
    
-    x = x / PI * 180;
-    if (x > 10) {
+    x = x / PI * 180; //convert x from radians to degress
+    if (x > 10) {               //if greater than 10, x = 10
       x = 10;
-    } else if (x < -10) {
+    } else if (x < -10) {       //if less than -10, x = -10
       x = -10;
     }  
 }
