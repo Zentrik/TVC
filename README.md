@@ -3,6 +3,8 @@ Thrust Vector Control Model Rocket.slx is a simulink simulation of the rocket at
 
 Tune.slx is for tuning PID values as simulink fails some of the time when using Thrust Vector Control Model Rocket.slx
 
+Main.cpp is an implementation in arduino for the bluepill.It should work with arduinos, just copy paste the contents into the arduino ide or whichever you prefer
+
 # Recommended Watching
 
 https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg BPS.space
