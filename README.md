@@ -5,8 +5,15 @@ Tune.slx is for tuning PID values as simulink fails some of the time when using 
 
 # Recommended Watching
 
-https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg
+https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg BPS.Space
 
-https://www.youtube.com/user/ControlLectures/videos
+https://www.youtube.com/user/ControlLectures/videos Brian Douglas
 
-https://youtu.be/wkfEZmsQqiA
+https://youtu.be/wkfEZmsQqiA Understanding PID Control, Part 1: What is PID Control?
+
+https://www.youtube.com/watch?v=ImctYI8hgq4 How to read values from mpu6050
+
+# Recommended Reading
+https://www.patreon.com/posts/book-is-now-free-28313078 The Fundamentals of Control Theory
+
+https://www.youtube.com/watch?v=BcKL4M5XodY Books Joe Barnard (BPS.Space) recommends
