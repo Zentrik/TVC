@@ -3,6 +3,7 @@
 #include <Servo.h>
 #include <SimpleKalmanFilter.h>
 #include <Adafruit_BMP280.h>
+#include 'Quaternion.h'
 
 Adafruit_BMP280 bmp; // I2C
 const int sealevel = 1027; //current sea pressure
@@ -17,6 +18,7 @@ float rollOld = 0.0; //initialise variable that hold old gyro values
 float pitchOld = 0.0;
 float yawOld = 0.0;
 double rollAngle, pitchAngle, yawAngle; //declare variable that holds current angle, integrated from angular velocity measurement from gyro
+Quaternion current(1.0, 0.0, 0.0, 0.0);
 
 float rollCalibrationValue = -164.63; //offset gyro readings so when no movement reading is near 0
 float pitchCalibrationValue = -20.63;
@@ -182,28 +184,39 @@ void gyro() {
 
   rollNew += (roll - rollCalibrationValue) / 65.5;      //65.5 = 1 deg/sec (check the datasheet of the MPU-6050 for more information).
   pitchNew += (pitch - pitchCalibrationValue) / 65.5;   //to average them
+  yawNew += (yaw - yawCalibrationValue) / 65.5;
 }
 
 void gyroAverage() {
   rollNew = rollKalmanFilter.updateEstimate(rollNew / (intervalGyroAverage / intervalGyro));    //average gyro readings and then pass into kalman filter
-  rollAngle += (rollNew + rollOld) * intervalGyroAverage / 2000;        //trapezoidal integral
+  pitchNew = pitchKalmanFiter.updateEstimate(pitchNew / (intervalGyroAverage / intervalGyro);   //average gyro readings and then pass into kalman filter
+  yawNew = yawKalmanFiter.updateEstimate(yawNew / (intervalGyroAverage / intervalGyro);
+  
+  rollNew = rollNew/ 180 * PI; //degrees to radians
+  pitchNew = pitchNew/ 180 * PI;
+  yawNew = yawNew/ 180 * PI;
 
-  if (rollAngle > 180) {            //constrain angle to be between -180 to + 180
-    rollAngle -= 360;               //if angle is 190 it becomes -170
-  } else if (rollAngle < -180) {
-    rollAngle += 360;               //if angle is -190 it becomes 170
-  }
+  // for small rotations, quick & dirty quaternion is sufficient
+  // (note: all angles *must* be in radians!)
+  int k = intervalGyroAverage * 0.5;
+  Quaternion raw_delta_Q(1.0, rollNew*k, pitchNew*k, yawNew*k);  // unnormalized!
+
+  // combine rotation for current timestep with orientation state
+  current = current * raw_delta_Q;  // multiply by unnormalized delta
+  current = current / normalize(current);  // then renormalize it!
+
+  /* Quaternion one(1.0, 0.0, 0.0, 0.0);
+  Quaternion r(1.0, rollNew, pitchNew, yawNew);
+  int dt = intervalGyroAverage;
+  current = one - r / one  * dt * 0.5;  //https://github.com/adafruit/Adafruit_BNO055/blob/master/utility/quaternion.h
+
+  Quaternion w(0, rollNew, pitchNew, yawNew);
+  current = current * (dt * 0.5 * current * w) */ //https://stackoverflow.com/questions/23503151/how-to-update-quaternion-based-on-3d-gyro-data
+
+  yawOld = yawNew;
+  yawNew = 0;
   rollOld = rollNew;
   rollNew = 0;
-
-  pitchNew = pitchKalmanFiter.updateEstimate(pitchNew / (intervalGyroAverage / intervalGyro);   //average gyro readings and then pass into kalman filter
-  pitchAngle += (pitchNew + pitchOld) * intervalGyroAverage / 2000;     //trapezoidal integral
-
-  if (pitchAngle > 180) {           //constrain angle to be between -180 to + 180
-    pitchAngle -= 360;              //if angle is 190 it becomes -170
-  } else if (pitchAngle < -180) {
-    pitchAngle += 360;              //if angle is -190 it becomes 170
-  }
   pitchOld = pitchNew;
   pitchNew = 0;
 }
