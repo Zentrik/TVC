@@ -3,7 +3,11 @@
 #include <Servo.h>
 #include <SimpleKalmanFilter.h>
 #include <Adafruit_BMP280.h>
-#include 'Quaternion.h'
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+
+using imu::Quaternion;
+using imu::Vector;
 
 Adafruit_BMP280 bmp; // I2C
 const int sealevel = 1027; //current sea pressure
@@ -18,7 +22,10 @@ float rollOld = 0.0; //initialise variable that hold old gyro values
 float pitchOld = 0.0;
 float yawOld = 0.0;
 double rollAngle, pitchAngle, yawAngle; //declare variable that holds current angle, integrated from angular velocity measurement from gyro
-Quaternion current(1.0, 0.0, 0.0, 0.0);
+float norm, dtlo2, a, q0, q1, q2, q3; //variables for angular velocity to quaternion conversion
+Quaternion orientation;
+Vector<3> v;
+Vector<3> z(0, 0, 1);
 
 float rollCalibrationValue = -164.63; //offset gyro readings so when no movement reading is near 0
 float pitchCalibrationValue = -20.63;
@@ -144,16 +151,16 @@ void loop() {
     previousMillis = currentMillis; // save the last time you blinked the LED
     
     gyroAverage();
-    PIDx(rollAngle);        //pass x axis rotation into pid function
-    PIDy(pitchAngle);       //pass y axis rotation into pid function
+    PIDx(pitchAngle);        //pass x axis rotation into pid function
+    PIDy(yawAngle);       //pass y axis rotation into pid function
 
     Serial.print(x);            //pid output for x axis
     Serial.print("\t");
-    Serial.print(rollAngle,5);  //x axis rotation
+    Serial.print(pitchAngle,5);  //x axis rotation
     Serial.print("\t");
     Serial.print(y);            //pid output for y axis
     Serial.print("\t");
-    Serial.print(pitchAngle,5); //y axis rotation
+    Serial.print(yawAngle,5); //y axis rotation
     Serial.print("\n");
 
     //servop.write(x);
@@ -189,29 +196,29 @@ void gyro() {
 
 void gyroAverage() {
   rollNew = rollKalmanFilter.updateEstimate(rollNew / (intervalGyroAverage / intervalGyro));    //average gyro readings and then pass into kalman filter
-  pitchNew = pitchKalmanFiter.updateEstimate(pitchNew / (intervalGyroAverage / intervalGyro);   //average gyro readings and then pass into kalman filter
-  yawNew = yawKalmanFiter.updateEstimate(yawNew / (intervalGyroAverage / intervalGyro);
+  pitchNew = pitchKalmanFilter.updateEstimate(pitchNew / (intervalGyroAverage / intervalGyro));   //average gyro readings and then pass into kalman filter
+  yawNew = yawKalmanFilter.updateEstimate(yawNew / (intervalGyroAverage / intervalGyro));
   
-  rollNew = rollNew/ 180 * PI; //degrees to radians
-  pitchNew = pitchNew/ 180 * PI;
-  yawNew = yawNew/ 180 * PI;
+  rollNew = rollNew / 180 * PI; //degrees to radians
+  pitchNew = pitchNew / 180 * PI;
+  yawNew = yawNew / 180 * PI;
 
-  // for small rotations, quick & dirty quaternion is sufficient
-  // (note: all angles *must* be in radians!)
-  int k = intervalGyroAverage * 0.5;
-  Quaternion raw_delta_Q(1.0, rollNew*k, pitchNew*k, yawNew*k);  // unnormalized!
+  Quaternion w(0, rollNew, pitchNew, yawNew); //quaternion representation of angular velocities
+  norm = w.magnitude(); //norm of w quaternion
+  dtlo2 = norm * intervalGyroAverage / 2000; 
 
-  // combine rotation for current timestep with orientation state
-  current = current * raw_delta_Q;  // multiply by unnormalized delta
-  current = current / normalize(current);  // then renormalize it!
+  a = sin(dtlo2) / norm; //useless variable, only to speed up computation
+  q0 = cos(dtlo2);
+  q1 = a * rollNew;
+  q2 = a * pitchNew;
+  q3 = a * yawNew;
 
-  /* Quaternion one(1.0, 0.0, 0.0, 0.0);
-  Quaternion r(1.0, rollNew, pitchNew, yawNew);
-  int dt = intervalGyroAverage;
-  current = one - r / one  * dt * 0.5;  //https://github.com/adafruit/Adafruit_BNO055/blob/master/utility/quaternion.h
+  Quaternion r(q0, q1, q2, q3); //create quaternion of change in angle from last update    
+  orientation = orientation * r;  //update orientation quaternion
 
-  Quaternion w(0, rollNew, pitchNew, yawNew);
-  current = current * (dt * 0.5 * current * w) */ //https://stackoverflow.com/questions/23503151/how-to-update-quaternion-based-on-3d-gyro-data
+  v = orientation.rotateVector(z); //rotate khat by quaternion to calculate i and j hat values
+  pitchAngle = atan(v.y() / v.x()); //x axis TVC
+  yawAngle = atan(v.x() / v.y()); //y axis TVC
 
   yawOld = yawNew;
   yawNew = 0;
@@ -222,7 +229,7 @@ void gyroAverage() {
 }
 
 void PIDy(double errorAngle) {
-    errorAngle = errorAngle / 180 * PI; //degrees to rads
+    //errorAngle = errorAngle / 180 * PI; //degrees to rads
     
     rtb_FilterDifferentiatorTFy = PIDTVCAngle_N * TSamp_WtEt;
     rtb_Sumy = 1.0 / (Constant_Value + rtb_FilterDifferentiatorTFy);
@@ -249,7 +256,7 @@ void PIDy(double errorAngle) {
 }
 
 void PIDx(double errorAngle) {
-    errorAngle = errorAngle / 180 * PI; //degrees to rads
+    //errorAngle = errorAngle / 180 * PI; //degrees to rads
     
     rtb_FilterDifferentiatorTFx = PIDTVCAngle_N * TSamp_WtEt;
     rtb_Sumx = 1.0 / (Constant_Value + rtb_FilterDifferentiatorTFx);
