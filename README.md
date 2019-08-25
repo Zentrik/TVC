@@ -23,3 +23,5 @@ Main.cpp is an implementation in arduino for the bluepill (stm32f103c8t6).It sho
 https://folk.ntnu.no/skoge/prost/proceedings/ecc-2013/data/papers/0927.pdf
 
 https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/20120014565.pdf
+
+http://ardupilot.org/dev/docs/apmcopter-programming-attitude-control-2.html
