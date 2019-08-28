@@ -25,3 +25,11 @@ https://folk.ntnu.no/skoge/prost/proceedings/ecc-2013/data/papers/0927.pdf
 https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/20120014565.pdf
 
 http://ardupilot.org/dev/docs/apmcopter-programming-attitude-control-2.html
+
+
+http://ardupilot.org/dev/docs/ekf2-estimation-system.html?highlight=quaternion
+
+Instead of trying to estimate the quaternion orientation directly, it estimates an error rotation vector and applies the correction to the quaternion from the inertial navigation equations. This is better when there are large angle errors as it avoids errors associated with linearising quaternions across large angle changes.
+
+    See “Rotation Vector in Attitude Estimation”, Mark E. Pittelkau, Journal of Guidance, Control, and Dynamics, 2003” for details on this approach.
+
