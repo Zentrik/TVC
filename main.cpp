@@ -14,6 +14,8 @@ const int sealevel = 1027; //current sea pressure
 
 Servo servox; //initialise servos for x and y axis (pitch and yaw)  
 Servo servoy;
+double gyro_theta = 0;
+Vector<3> gyro_axis(0, 0, 0);
 
 int16_t roll, pitch, yaw; //16bit signed integers, needs to be 16 bit as that is the output of MPU6050
 
@@ -31,8 +33,6 @@ Quaternion error;
 double angle_divided_by_sin_angle_error_placeholder;
 double x_error = 0;
 double y_error = 0;
-Vector<3> v;
-Vector<3> z(0, 0, 1);
 
 float rollCalibrationValue = -164.63; //offset gyro readings so when no movement reading is near 0
 float pitchCalibrationValue = -20.63;
@@ -170,8 +170,12 @@ void loop() {
     Serial.print(y_error,5); //y axis rotation
     Serial.print("\n");
 
-    servox.write(x);
-    servoy.write(y);
+    //get axis angle representaion of gyro position from desired gyro positions
+    gyro_theta = sqrt(x*x + y*y)
+    gyro_axis.x() = x/gyro_theta;
+    gyro_axis.y() = y/gyro_theta;
+    //servox.write(x);
+    //servoy.write(y);
   }
 
   if (currentMillis - previousMillisBaro >= intervalBaro) {
