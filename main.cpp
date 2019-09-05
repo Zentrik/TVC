@@ -24,6 +24,13 @@ float yawOld = 0.0;
 double rollAngle, pitchAngle, yawAngle; //declare variable that holds current angle, integrated from angular velocity measurement from gyro
 float norm, dtlo2, a, q0, q1, q2, q3; //variables for angular velocity to quaternion conversion
 Quaternion orientation;
+double orientation_angle_placeholder;
+double place_holder;
+double place_holder_error_angle;
+Quaternion error;
+double angle_divided_by_sin_angle_error_placeholder;
+double x_error = 0;
+double y_error = 0;
 Vector<3> v;
 Vector<3> z(0, 0, 1);
 
@@ -151,20 +158,20 @@ void loop() {
     previousMillis = currentMillis; // save the last time you blinked the LED
     
     gyroAverage();
-    PIDx(pitchAngle);        //pass x axis rotation into pid function
-    PIDy(yawAngle);       //pass y axis rotation into pid function
+    PIDx(x_error);        //pass x axis rotation into pid function
+    PIDy(y_error);       //pass y axis rotation into pid function
 
     Serial.print(x);            //pid output for x axis
     Serial.print("\t");
-    Serial.print(pitchAngle,5);  //x axis rotation
+    Serial.print(x_error,5);  //x axis rotation
     Serial.print("\t");
     Serial.print(y);            //pid output for y axis
     Serial.print("\t");
-    Serial.print(yawAngle,5); //y axis rotation
+    Serial.print(y_error,5); //y axis rotation
     Serial.print("\n");
 
-    //servop.write(x);
-    //servoy.write(y);
+    servox.write(x);
+    servoy.write(y);
   }
 
   if (currentMillis - previousMillisBaro >= intervalBaro) {
@@ -216,9 +223,26 @@ void gyroAverage() {
   Quaternion r(q0, q1, q2, q3); //create quaternion of change in angle from last update    
   orientation = orientation * r;  //update orientation quaternion
 
-  v = orientation.rotateVector(z); //rotate khat by quaternion to calculate i and j hat values
-  pitchAngle = atan(v.y() / v.x()); //x axis TVC
-  yawAngle = atan(v.x() / v.y()); //y axis TVC
+  // CALCULATE ERROR QUATERNION
+  if (abs(orientation.w()) == 1) { //if 0 degree rotation set error to identity unit quaternion
+    x_error = 0;
+    y_error = 0;
+  } else {
+    orientation_angle_placeholder = acos(orientation.w()); //place holder
+    place_holder = atan(tan(orientation_angle_placeholder) * orientation.z()/sin(orientation_angle_placeholder));
+    Quaternion roll(cos(place_holder), 0, 0,sin(place_holder)); // split orientation quaternion into a rotation around the k axis and then a rotation about a vector in the ij plane
+    error = orientation.conjugate() * roll; // rotates from orientation to [1 0 0 0] and then rotates to roll quaternion, gives us the quaternion that represents this rotaiton
+    place_holder_error_angle = (acos(error.w()) < 0); 
+    
+    if (place_holder_error_angle < 0) { //if error quaternion represents a rotation greater than 180 degrees find the quaternion that is the same but will rotate -x degrees, as it is a shorter distance
+      error.w() = cos(PI - place_holder_error_angle);
+    }
+    // CALCULATE X Y ERROR, i.e. if there is a simultaneous rotation about i hat (y) and j hat (x), what rotation is needed for each axis. Essentially work out the angular velocity needed to reach that orientation if the angular velocity is applied over 1 second
+    angle_divided_by_sin_angle_error_placeholder = 2*acos(error.w()) / sin(acos(error.w()));
+    //angle_axis_orientation(2*acos(q_orientation(1)) q_orientation(2:4)/s]; //angle axis orientation of the error quaternion
+    y_error = angle_divided_by_sin_angle_error_placeholder * error.x(); //angle * i hat value
+    x_error = angle_divided_by_sin_angle_error_placeholder * error.y(); //angle * j hat value
+  }
 
   yawOld = yawNew;
   yawNew = 0;
