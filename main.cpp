@@ -171,7 +171,7 @@ void loop() {
     Serial.print("\n");
 
     //get axis angle representaion of gyro position from desired gyro positions
-    gyro_theta = sqrt(x*x + y*y)
+    gyro_theta = sqrt(x*x + y*y);
     gyro_axis.x() = x/gyro_theta;
     gyro_axis.y() = y/gyro_theta;
     //servox.write(x);
