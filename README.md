@@ -1,7 +1,7 @@
 # TVC
-Thrust Vector Control Model Rocket.slx is a simulink simulation of the rocket attempting to maintain an upright position during flight and can track horizontal velocity due to the TVC
+Quaternion 6DOF.slx is a simulink simulation of the rocket attempting to maintain an upright position during flight. 
 
-Tune.slx is for tuning PID values as simulink fails some of the time when using Thrust Vector Control Model Rocket.slx
+Tune2.slx is for tuning PID values.
 
 Main.cpp is an implementation in arduino for the bluepill (stm32f103c8t6).It should work with arduinos, just copy paste the contents into the arduino ide or whichever you prefer
 
