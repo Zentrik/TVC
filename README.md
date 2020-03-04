@@ -1,3 +1,4 @@
+# DEPRECATED PROJECT, WILL BE UPDATED IN 2021 TO WORKING CONTROLLER
 # TVC
 Quaternion 6DOF.slx is a simulink simulation of the rocket attempting to maintain an upright position during flight. 
 
