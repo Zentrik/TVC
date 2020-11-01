@@ -1,12 +1,4 @@
-# DEPRECATED PROJECT, WILL BE UPDATED IN 2021 TO WORKING CONTROLLER
-# TVC
-Quaternion 6DOF.slx is a simulink simulation of the rocket attempting to maintain an upright position during flight. 
-
-Tune2.slx is for tuning PID values.
-
-Main.cpp is an implementation in arduino for the bluepill (stm32f103c8t6).It should work with arduinos, just copy paste the contents into the arduino ide or whichever you prefer
-
-Using [utility header files](https://github.com/adafruit/Adafruit_BNO055/tree/master/utility) from adafuit bno055 library for quaternion class.
+# DEPRECATED PROJECT, WILL BE UPDATED IN 2021 TO WORKING GNC SCHEME
 
 # Recommended Watching
 
@@ -16,11 +8,16 @@ Using [utility header files](https://github.com/adafruit/Adafruit_BNO055/tree/ma
 
 [Understanding PID Control, Part 1: What is PID Control?](https://youtu.be/wkfEZmsQqiA)
 
+Other videos by brian, brunton, 3b1b etc.
+
 [How to read values from mpu6050](https://www.youtube.com/watch?v=ImctYI8hgq4)
 
 [Quaternions by 3Blue1Brown](https://www.youtube.com/watch?v=d4EgbgTm0Bg)
 
 # Recommended Reading
+
+My paper, it's not great but its something.
+
 [The Fundamentals of Control Theory](https://www.patreon.com/posts/book-is-now-free-28313078)
 
 [Books Joe Barnard (BPS.space) recommends](https://www.youtube.com/watch?v=BcKL4M5Xod)
