@@ -1,0 +1,49 @@
+num = 20;
+
+model = 'roll_control';
+
+cd 'C:\Users\rag\Documents\GitHub\EPQ\Rocket'
+load_system(model)
+Simulink.BlockDiagram.buildRapidAcceleratorTarget(model);
+
+for m = 1:num
+    in(m) = Simulink.SimulationInput(model);
+end
+
+in = in.setModelParameter('SimulationMode', 'rapid-accelerator');
+in = in.setModelParameter('RapidAcceleratorUpToDateCheck', 'off');
+simOut = parsim(in,'ShowSimulationManager','on', 'TransferBaseWorkspaceVariables', 'on');
+
+close all
+
+rows = nums;
+for j = 1:rows
+    subplot(rows, 2, 2*j - 1)
+    legend_labels = cell(1,numv);
+    for m = 1:numv
+            i = nums * (m - 1) + j;
+            out = simOut(i);
+            ts = out.tmp_raccel_logsout{8}.Values;
+            data = ts.data(:,3);
+            plot(ts.time, data);
+            legend_labels{m} = ['Run ' num2str(i)];
+            hold all
+    end
+    xlabel('Time (s)');
+    ylabel('Height (m)');
+    legend(legend_labels)
+
+    subplot(rows, 2, 2*j)
+
+    for m = 1:numv
+            i = nums * (m - 1) + j;
+            out = simOut(i);
+            ts = out.tmp_raccel_logsout{7}.Values;
+            data = ts.data(:,3);
+            plot(ts.time, data);
+            hold all
+    end
+    xlabel('Time (s)');
+    ylabel('Z Velocity (m)');
+    legend(legend_labels)
+end

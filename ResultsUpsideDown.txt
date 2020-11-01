@@ -1,0 +1,274 @@
+NO CONTROL 
+
+mean =
+
+    0.0763    0.9751    0.0886  101.8907
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.5121
+
+
+maximum =
+
+    0.5538    1.0000    0.9998  180.0000
+	
+mean =
+
+    2.7660    0.4332
+
+
+variance =
+
+    6.5813    0.1520
+
+
+maximum =
+
+    7.7999    1.1245
+	
+VELOCITY CONTROL DISCRETE NO TIME DELAY
+
+mean =
+
+    2.6653    0.7400
+
+
+variance =
+
+    4.3123    0.1785
+
+
+maximum =
+
+    7.0256    1.6632
+	
+VELOCITY CONTROL CONTINUOUS NO TIME DELAY
+
+
+mean =
+
+    2.6774    0.7862
+
+
+variance =
+
+    4.3203    0.2169
+
+
+maximum =
+
+    7.0260    1.8476
+	
+VELOCITY CONTROL DISCRETE TIME DELAY
+mean =
+
+    2.9628    0.4872
+
+
+variance =
+
+    5.0809    0.1103
+
+
+maximum =
+
+    7.5116    1.1786
+	
+VELOCITY CONTROL DISCRETE TIME DELAY GAIN SCHEDULED
+
+mean =
+
+    2.6943    0.4761
+
+
+variance =
+
+    4.1990    0.0843
+
+
+maximum =
+
+    7.0161    1.1701
+	
+VELOCITY CONTROL CONTINUOUS TIME DELAY GAIN SCHEDULED
+
+mean =
+
+    2.1157    0.3170
+
+
+variance =
+
+    4.4621    0.0531
+
+
+maximum =
+
+    7.0025    0.8035
+
+VELOCITY CONTROL CONTINUOUS TIME DELAY
+
+mean =
+
+    2.3941    0.4433
+
+
+variance =
+
+    4.1920    0.0856
+
+
+maximum =
+
+    6.9852    1.0262
+
+
+CONTINUOUS ATTITUDE NO TIME DELAY
+	
+mean =
+
+    0.0102    0.9993    0.0062   63.3448
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.0445
+
+
+maximum =
+
+    0.3645    1.0000    0.8922  180.0000
+	
+CONTINUOUS ATTITUDE NO TIME DELAY GAIN SCHEDULED
+
+mean =
+
+    0.0093    0.9992    0.0074   61.7304
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.0737
+
+
+maximum =
+
+    0.4659    1.0000    0.8742  180.0000
+
+	
+DISCRETE ATTITUDE NO TIME DELAY
+	
+mean =
+
+    0.0110    0.9991    0.0073   63.0980
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.0659
+
+
+maximum =
+
+    0.3600    1.0000    0.9327  180.0000
+	
+ATTITUDE CONTROL DISCRETE NO TIME DELAY GAIN SCHEDULED
+
+mean =
+
+    0.0100    0.9991    0.0087   61.4623
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.0938
+
+
+maximum =
+
+    0.4127    1.0000    0.8041  180.0000
+	
+ATTITUDE CONTROL DISCRETE TIME DELAY GAIN SCHEDULED
+
+mean =
+
+    0.0163    0.9987    0.0106   62.9913
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.2405
+
+
+maximum =
+
+    0.4786    1.0000    0.8736  180.0000
+	
+ATTITUDE CONTROL DISCRETE TIME DELAY
+
+mean =
+
+    0.0139    0.9989    0.0089   63.3694
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.1584
+
+
+maximum =
+
+    0.4589    1.0000    0.8885  180.0000
+	
+ATTITUDE CONTROL CONTINUOUS TIME DELAY GAIN SCHEDULED
+
+mean =
+
+    0.0146    0.9987    0.0110   61.3351
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.2240
+
+
+maximum =
+
+    0.6051    1.0000    0.7962  180.0000
+	
+ATTITUDE CONTROL CONTINUOUS TIME DELAY
+
+
+mean =
+
+    0.0158    0.9988    0.0095   63.0841
+
+
+variance =
+
+   1.0e+03 *
+
+    0.0000    0.0000    0.0000    3.2158
+
+
+maximum =
+
+    0.5168    1.0000    0.8561  180.0000

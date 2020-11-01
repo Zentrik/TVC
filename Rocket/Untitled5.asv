@@ -1,0 +1,6 @@
+ Q = diag([2 2 2 1 1 1]);
+R = diag([1 1 1 1.5 1.5 1.5 3]);
+ekf = extendedKalmanFilter(@vdpStateFcn,@vdpMeasurementNonAdditiveNoiseFcn,zeros(1, 12), 'HasAdditiveProcessNoise', false, 'HasAdditiveMeasurementNoise', false, 'ProcessNoise', Q, 'MeasurementNoise', R);
+
+[CorrectedState,CorrectedStateCovariance] = correct(ekf, [1 0 0 -1 -2 10 0], [1 1 1 12 .1 .1 .01 .5]');
+[PredictedState,PredictedStateCovariance] = predict(ekf, [1 1 1 12 .1 .1 .01 .5]');

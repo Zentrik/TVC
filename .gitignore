@@ -1,0 +1,37 @@
+/Rocket/slcov_output
+/Rocket/slprj
+/Rocket/Forces_grt_rtw
+Rocket/codegen/
+
+Paper/*
+!Paper/*.tex
+!Paper/*.sty
+!Paper/*.pdf
+!Paper/*.bib
+!Paper/Images
+!Paper/svg-inkscape
+
+*.tmp
+# Word temporary
+~$*.doc*
+.~lock.Research Log.docx#
+
+# Word Auto Backup File
+Backup of *.doc*
+
+# Excel temporary
+~$*.xls*
+
+# Excel Backup File
+*.xlk
+
+# PowerPoint temporary
+~$*.ppt*
+
+Rocket/KalmanFilterBasic_grt_rtw/
+Rocket/*.mat
+Presentations/.~lock.Final Presentation.pptx#
+.DS_Store
+.~lock.EPQ Update February.docx#
+.~lock.Gannt Chart.xlsx#
+Presentations/.~lock.Poster Presentation.pptx#

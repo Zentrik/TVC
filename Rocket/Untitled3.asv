@@ -1,0 +1,22 @@
+function x = vdpStateFcn(x, w, u) 
+dt = 0.001; % [s] Sample time
+x = x + vdpStateFcnContinuous(x, w, u) * dt;
+end
+
+function dxdt = vdpStateFcnContinuous(x, wk, u)
+Mb = u(1:3) + wk(1:3);
+ThrustAcceleration = u(4);
+I = diag(u(5:7));
+COTCOM = u(8);
+q = u(9:12);
+
+Ve = x(8:10);
+Xe = x(11:13);
+
+qin = q';
+DCM = [qin(:,1).^2 + qin(:,2).^2 - qin(:,3).^2 - qin(:,4).^2 , 2.*(qin(:,2).*qin(:,3) + qin(:,1).*qin(:,4)), 2.*(qin(:,2).*qin(:,4) - qin(:,1).*qin(:,3)) ; ...
+    2.*(qin(:,2).*qin(:,3) - qin(:,1).*qin(:,4)), qin(:,1).^2 - qin(:,2).^2 + qin(:,3).^2 - qin(:,4).^2, 2.*(qin(:,3).*qin(:,4) + qin(:,1).*qin(:,2)) ; ...
+    2.*(qin(:,2).*qin(:,4) + qin(:,1).*qin(:,3)), 2.*(qin(:,3).*qin(:,4) - qin(:,1).*qin(:,2)), qin(:,1).^2 - qin(:,2).^2 - qin(:,3).^2 + qin(:,4).^2];
+
+dxdt = [I \ (Mb - cross(w,I*w)); .5 * quatmultiply(q', [0;w]')'; DCM' * ([0;0;ThrustAcceleration] + [Mb(1:2);0] / COTCOM) + [0;0;-9.80655] + wk(4:6); Ve];
+end

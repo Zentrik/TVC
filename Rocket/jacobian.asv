@@ -1,0 +1,3 @@
+function [A, B] = jacobian(Inertia, Quaternion, omega)
+    A = jacobian([inv(Inertia) * (Mb - cross(w, I*w)); .5*quatmultiply([w.' 0],q.').'], [w; q]);
+    B = jacobian([InverseI * (Mb - cross(w, I*w)); .5*quatmultiply([w.' 0],q.').'], Mb);

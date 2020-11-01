@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+************************************************************************
+ Flight Gear 0.9.3/0.9.8a config file for HL-20 network simulation
+
+ Background information: http://oea.larc.nasa.gov/PAIS/HL-20.html
+
+ 
+ Copyright 1990-2018 The MathWorks Inc.
+
+ R. Aberg
+ 2003-NOV-26
+************************************************************************
+-->
+
+<PropertyList>
+
+ <sim>
+  <description>Rocket</description>
+
+  <flight-model>network</flight-model>
+
+  <model>
+    <path>Aircraft/Rocket/Models/Rocket.xml</path>
+  </model>
+ </sim>
+
+</PropertyList>
