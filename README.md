@@ -1,5 +1,7 @@
 # DEPRECATED PROJECT, WILL BE UPDATED IN 2021 TO WORKING GNC SCHEME
 
+roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from StateSpaceController.m.
+
 # Recommended Watching
 
 [BPS.space](https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg)
