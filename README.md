@@ -1,6 +1,6 @@
 # DEPRECATED PROJECT, WILL BE UPDATED IN 2021 TO WORKING GNC SCHEME
 
-roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from StateSpaceController.m.
+Rocket/roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from Rocket/StateSpaceController.m.
 
 # Recommended Watching
 
