@@ -2,6 +2,9 @@
 
 Rocket/roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from Rocket/StateSpaceController.m.
 
+<a href="https://www.paypal.com/paypalme/zentriktvc/5/"><img src="blue.svg" height="40"></a>  
+If you found my work useful, conside donating. Thanks.
+
 # Recommended Watching
 
 [BPS.space](https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg)
