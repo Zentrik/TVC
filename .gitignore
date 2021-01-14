@@ -14,7 +14,6 @@ Paper/*
 *.tmp
 # Word temporary
 ~$*.doc*
-.~lock.Research Log.docx#
 
 # Word Auto Backup File
 Backup of *.doc*
@@ -30,8 +29,4 @@ Backup of *.doc*
 
 Rocket/KalmanFilterBasic_grt_rtw/
 Rocket/*.mat
-Presentations/.~lock.Final Presentation.pptx#
 .DS_Store
-.~lock.EPQ Update February.docx#
-.~lock.Gannt Chart.xlsx#
-Presentations/.~lock.Poster Presentation.pptx#
