@@ -1,5 +1,3 @@
-# DEPRECATED PROJECT, WILL BE UPDATED IN 2021 TO WORKING GNC SCHEME
-
 Rocket/roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from Rocket/StateSpaceController.m.
 The gain scheduled controllers may be incorrect as I linearised about points which are not in equilbrium, which I don't think you are supposed to do.
 
