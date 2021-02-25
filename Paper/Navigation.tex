@@ -1,0 +1,225 @@
+\section{Navigation} 
+\label{sec:Navigation}
+
+Control and guidance need to know certain information accurately, typically the state or the error, in order to perform well. 
+In order to obtain this information state estimation or observation must be employed and so state estimation or observation is critical in being able to achieve \gls{vtvl}.
+State observation involves estimating states assuming no noise in the measurements whilst state estimation accounts for noise in the measurements~\cite{Qi2018, Bur2012}.
+State estimation or observation requires that the system be observable as discussed in~\fullrefnocomma{sec:StateSpace}.
+We will be using state estimation or observation to estimate the additional states from a padé approximation and the states in the~\modelref{KF Model} using~\modelrefnocomma{Accurate Actuator} from sensor measurements.~\modelref{KF Model} will be used as guidance and control collectively require knowledge of position, velocity, orientation and angular velocity.
+
+The state estimate is referred to as $\hbx$ and the true state is referred to as $\m x$. 
+$\hbx_{n \mid m}$ represents the estimate of $\m x$ at time $n$ given observations up to and including $m$ where $m \leq n$. 
+%
+\subsection{Luenberger observer}
+
+The Luenberger observer, a state observer, sets $\m L$ such that the observer error $\m e$, $\m x - \hbx$, approaches 0 as $t \to \infty$
+\begin{align}
+    \dot{ \hbx } &= \m A \hbx + \m B \m u + \m L (\m y - \hby) \\
+    \hat{\m y} &= \m C \hbx + \m{Du} \\
+    \dot{ \m e } &= (\m A - \m L \m C) \m e
+\end{align}
+The gain $\m L$ can be obtained either through pole placement or \gls{lqr} as $\dot{ \m e } = (\m A\tran - \m C\tran \m L\tran) \m e$~\cite{fri2005}.
+%
+\subsection{Kalman filter}
+
+The Kalman filter, a state estimator, is typically separated into two stages: predict and update. 
+In the predict stage, the current state and covariance is estimated using the previous state and covariance and the system dynamics.
+In the update stage, the current state and covariance is updated using the current observation. 
+The Kalman filter is an optimal state estimator for a system described as:
+\begin{align}
+    \m x_{k+1} &= \m F \m x_k + \m B \m u_k + \m w_k \\
+    \m w &\sim \mathcal{N} \{0,\m{W}\} \\
+    \m y_k &= \m H \m x_k + \m v_k \\
+    \m v &\sim \mathcal{N} \{0,\m{V}\}
+    \intertext{Predict:}
+    \hbx_{k \mid k-1} &= \m F \hbx_{k-1 \mid k-1} + \m B \m u_{k-1} \\
+    \label{eq:predictCovariance}
+    \m P_{k \mid k-1} &= \m F \m P_{k-1 \mid k-1} \m F_k\tran + \m W \\
+    \intertext{Update:}
+    \label{eq:KalmanGain}
+    \m K_k &= \m P_{k \mid k-1} \m H\tran (\m H \m P_{k \mid k-1} \m H\tran + \m V)^{-1} \\
+    \hbx_{k \mid k} &= \hbx_{k \mid k-1} + \m K (\m y_k - \m H \hbx_{k \mid k-1}) \\
+    \label{eq:badCovarianceUpdate}
+    \m P_{k \mid k} &= (\m I - \m K_k \m H) \m P_{k \mid k-1} \\
+\end{align} \cite{fri2005}
+
+Equation \eqref{eq:badCovarianceUpdate} is known to have poor numerical stability as its outcome is not guaranteed to be symmetric nor positive definite.
+\begin{align}
+    \intertext{The symmetric form of the covariance update is:} 
+    \m P_{k \mid k} &= \m P_{k \mid k-1} - \m K_k (\m H \m P \m H\tran + \m V) \m K\tran \\
+    \intertext{The symmetric and positive Joseph form is:} 
+    \m P_{k \mid k} &= (\m I - \m K_k \m H ) \m P_{k \mid k-1} (\m I - \m K_k \m H )\tran + \m K_k \m V \m K_k\tran
+\end{align}
+\cite{Sol2017}
+\subsubsection{Asymptotic form}
+%
+The limit of $\m K_k$ can be found as $k \to \infty$ if the conditions in \cite{Wal2006} hold. 
+And so the limit of $\m K_k$ as $k \to \infty$ can be used in a discrete version of the Luenberger observer instead of $\m L$.
+
+
+Both a Kalman filter and Luenberger observer are unsuitable to estimate the states for a system as described as by~\modelref{KF Model} using~\modelref{Accurate Actuator} as the system is non-linear, and therefore cannot be estimated sufficiently by linear techniques. 
+Non-linear state estimators should be used for this system as they are designed for non-linear systems with noisy measurements.
+
+A Luenberger observer is best suited in order to observe the additional states added by a padé approximation as the original states can be estimated using a state estimator so noise can be ignored. 
+A state estimator that directly estimates the additional state added by a padé approximation could be used, however this would require the state estimator to be changed depending on the controller being used. 
+%
+\subsection{Extended Kalman Filter}
+
+The \gls{ekf} is an extension to the Kalman filter for non-linear systems of the form, where the state transition and observation functions are differentiable:
+\begin{align}
+    \m x_k &= f(\m x_{k-1}, \m u_{k-1}, \bullet) + \m w_{k-1} \\
+    \m y_k &= h(\m x_k, \bullet) + \m v_k \\
+    \m w &\sim \mathcal{N} \{0,\m{W}\} \\
+    \m v &\sim \mathcal{N} \{0,\m{V}\}
+\end{align}
+
+It does this by linearising the system at each time step:
+\begin{align}
+    \m F_k &= \pjac{\fm f}{\m x}{\hbx_{k-1 \mid k-1}, \m u_{k-1}, \bullet} \\
+    \m H_k &= \pjac{\fm h}{\m x}{\hbx_{k-1 \mid k-1}, \bullet}
+\end{align}
+Predict:
+\begin{align}
+    \hbx_{k \mid k-1} = \fm f(\hbx_{k-1 \mid k-1}, \m u_{k-1}, \bullet)
+\end{align}
+Also, equation \eqref{eq:predictCovariance} is used.
+
+Update:
+
+Equation \eqref{eq:KalmanGain} is used.
+\begin{align}
+    \hbx_{k \mid k} = \hbx_{k \mid k-1} + \m K (\m y_k - \fm h(\hbx_{k \mid k-1}))
+\end{align}
+And any form of the covariance update.
+
+The \gls{ekf} is not an optimal state estimator unlike the Kalman filter.
+Additionally, \glspl{ekf} are sensitive to errors in the process model or the initial state, where the filter may quickly diverge, and the estimated covariance matrix is underestimated as it assumes non-linear functions are linear when calculating the covariances.
+However, \glspl{ekf} are the industry standard due to their ease of use.
+
+\Glspl{ukf} are similar in computation complexity to an \gls{ekf} but better estimate the covariance matrix as it doesn't linearise the model. 
+The \gls{usque} is a variant of the \gls{ukf} for quaternion state estimation.
+However, as shown in this~\cite{Zam2015}, bias estimation can be poor even though settle time for orientation is fast. 
+
+To convert~\modelref{KF Model} to a discrete state space representation, euler integration will be used. However, $\q_{k \mid k-1} = \q_{k-1 \mid k - 1} \otimes e^{\m \omega_{k-1  \mid  k - 1} \Delta t/ 2}$ will be used to update the unit quaternion as this equation conserves the unit length constraint of unit quaternions.
+
+A popular choice to measure states such as acceleration, \gls{attitude} and angular rate are \glspl{imu} which can contain gyroscopes, accelerometers and possibly magnetometers. 
+Additionally, a barometer and/or gps can be used to measure position and velocity
+
+We will use a gyroscope, accelerometers and barometer. Let the gyroscope bias be $\m \omega_b$ and noise $\m \omega_n$. Let the accelerometer bias be $\m a_b$ and noise $\m a_n$. Let the barometer noise be $\rho_n$, the bias in the barometer is ignored as adding sea level pressure to the Kalman state in order to account for calibration error and biases in the barometer, performed poorly with sea level pressure changing drastically even though it was meant to stay relatively constant.
+This may have been due to an implementation error or could be fixed in future work.
+
+The input to the functions are not listed for brevity.
+The measurement function, $\fm h$, in this case is:
+\begin{align} 
+    \label{eq:gyroscope}
+    [\m \omega^b]^{bn}_m &= [\m \omega^b]^{bi} + \m \omega^b_b + \m \omega^b_n \\
+    &= [\m \omega^b]^{bn} + \m R^{bn} [\m \omega^n]^{ie} + [\m \omega^b]^{bn}_b + \m \omega^b_n \\
+    \text{where } [\m \omega^n]^{ie} &\approx \begin{bmatrix}
+        0 & 0 & 7.29 \times 10^{-5}
+    \end{bmatrix} \text{ and } [\m \omega^n]^{ni} = \begin{bmatrix}
+        0 & 0 & 0
+    \end{bmatrix}\tran \\
+    [\m a^b]^{ii}_m &= [\m a^b]^{ii} + \m a^b_b + \m a^b_n - \m R^{bn}
+    \begin{bmatrix}
+        0 \\
+        0 \\
+        -g
+    \end{bmatrix}\tran \\
+    \label{eq:barometer}
+    \rho_m &= \rho_0 \left( 1 + \frac{L_b * r^n_z}{T_b} \right)^\frac{-g_0 * M}{R^* * L_b} + \rho_n \\
+    \label{eq:measurementFunction}
+    \fm h(\m x_k, \bullet) &= \begin{bmatrix}
+        [\m \omega^b]^{bn}_m \\
+        [\m a^b]^{ii}_m \\
+        \rho_m
+    \end{bmatrix}
+\end{align}
+\cite{Kok2017}
+\subsection{Right Invariant Extended Kalman Filter}
+
+The \gls{ekf} variant, \gls{riekf}, uses an \gls{ekf} to estimate deviations from a estimated nominal state and these deviations are used to update the estimated nominal state. This method has many advantages over an \gls{ekf}~\cite{Sol2017, Mad2011, Crassidis2003}:
+\begin{itemize}
+    \item The orientation deviation will have 3 parameters, the same as its degrees of freedom.
+    This does not lead to any problems, such as gimbal lock, as the deviation will always be close to the origin.
+    This means that there is not a risk of a singularity in the covariance matrices due to over-parametrization and thus enforcing constraints.
+    An \gls{ekf} is unsuitable for \gls{attitude} estimation as a continuous non singular parameterisation of \SO{3} has to be greater than three dimensional, as discussed in \fullref{sec:Dynamics} and this can lead to a singularity in the covariance matrices.
+    \item The deviations should be small, so the computation of the Jacobians will be easy and fast, as second order products are negligible.
+    \item `The error dynamics are slow because all the large-signal dynamics have been integrated in the nominal-state. This means that we can apply KF corrections at a lower rate than the predictions'~\cite{Sol2017}.
+\end{itemize}
+
+The nominal state $\m x$ can be predicted with a system obtained from~\modelref{KF Model}, and~\modelref{Accurate Actuator}:
+\begin{align}
+    \hbx_{k \mid k-1} = \fm f(\hbx_{k-1 \mid k-1}, \m u_{k-1}, \bullet)
+\end{align}
+
+The error state $\bd x$ can be modelled using estimated acceleration values $[\m a^b]^{ii}_m$ by:
+\begin{align}
+    \begin{bmatrix}
+        \bd p^n \\
+        \m \delta [\m v^n]^n \\
+        \bd \theta^n \\
+        \bd a^b_b \\
+        \bd \omega^b_b \\
+        [\m \omega^b]^{bn}
+    \end{bmatrix} \gets
+    \begin{bmatrix}
+        \bd p^n + \m \delta [\m v^n]^n \Delta t \\
+        \m \delta [\m v^n]^n + (-[\m{R}^{nb}([\m a^b]^{ii}_m - \m a^b_b)]_\times \bd \theta^n - \m{R}^{nb} \bd a^b_b) \Delta t + \m v^n_i \\
+        \bd \theta^n - \m{R}^{nb} \delta \m{\omega}^b_b \Delta t + \m \theta^n_i \\
+        \bd a^b_b + \m a^b_{b_i} \\
+        \bd \omega^b_b + \m{\omega}^b_{b_i} \\
+        [\m \omega^b]^{bn} + \m{\omega}_i
+    \end{bmatrix}
+\end{align}
+where $x\gets f(x,\bullet)$ stands for a time update $x_{k+1} = f(x_k,\bullet)$ \cite{Sol2017}.
+
+The measurement function is taken as defined in \crefrange{eq:gyroscope}{eq:measurementFunction} and the measurement jacobian $\m{H}$ is evaluated at the best true-state estimate $\hbx_k = \hbx_{k \mid k-1} \oplus \hat{\bd x}_{k \mid k-1}$. 
+%
+\begin{align}
+    \m{H} = \pjac{\fm h}{\bd x}{\hbx_k}
+\end{align}
+
+The Jacobians $\m F$ and $\m H$ can be partially seen in~\cite{Sol2017} or calculated using software, such as MATLAB.
+The truncated taylor series approximation of $\frac{sinx}{x}$ and $\arctan \frac{\norm{ \qv }}{\q_w}$ will be used to avoid division by $0$ in the Jacobians due to the presence of the quaternion exponential and logarithm.
+
+Use predict and update steps from \gls{ekf} where state is $\bd x$
+
+The nominal state update is defined as:
+\begin{align}
+    \hbx_{k \mid k} =
+    \begin{bmatrix} 
+        \m p^n \\
+        [\m v^n]^n \\
+        \q^{nb} \\
+        \m a^b_b \\
+        \m \omega^b_b \\
+        [\m \omega^b]^{bn}
+    \end{bmatrix} \gets
+    \begin{bmatrix}
+        \m p^n + \bd p^n \\
+        [\m v^n]^n + \m \delta [\m v^n]^n \\
+        e^{\bd \theta^n / 2}  \otimes \q^{nb} \\
+        \m a^b_b + \bd a^b_b \\
+        \m \omega^b_b + \bd \omega^b_b \\
+        [\m \omega^b]^{bn}
+    \end{bmatrix}
+\end{align}
+%
+Let $\fm g$ be the error reset function~\cite{Sol2017}:
+\begin{align}
+    \bd x &\gets \fm g(\bd x) =
+    \begin{bmatrix}
+        \bd p^n - \hat{\bd p^n} \\
+        \bd v^n - \hat{\m \delta [\m v^n]^n} \\
+        \hat{\bd q}^{bn} \otimes \bd q^{nb} \\
+        \bd a^b_b + \hat{\bd a^b_b} \\
+        \bd \omega^b_b + \hat{\bd \omega^b_b} \\
+        [\m \omega^b]^{bn}
+    \end{bmatrix}\\
+    \m{P}_{k \mid k} &= \m G_k \m P_{k \mid k-1} \m G _k\tran \\
+    \m{G}_k &= \pjac{\fm g}{\bd x}{\hat{\bd x}_{k \mid k}}
+\end{align}
+
+In conclusion, the \gls{riekf} should be used to estimate the state using sensor measurements due to its many advantages of an \gls{ekf}. 
+The advantages it has outweighs its increased complexity.
+Additionally, a Luenberger observer should be used to estimate the additional states when using a padé approximation for the time delays in the actuator.

@@ -1,0 +1,309 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Coordinate frames %%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newglossaryentry{cf:n}
+{% This entry goes in the ‘coordinateFrames’ glossary:
+type=coordinateFrames,
+name={$n$},
+text={$n$},
+description={Navigation frame},
+sort={n}}
+
+\newglossaryentry{cf:b}
+{% This entry goes in the ‘coordinateFrames’ glossary:
+type=coordinateFrames,
+name={$b$},
+text={$b$},
+description={Body frame},
+sort={b}}
+
+\newglossaryentry{cf:i}
+{% This entry goes in the ‘coordinateFrames’ glossary:
+type=coordinateFrames,
+name={$i$},
+text={$i$},
+description={Inertial frame},
+sort={i}}
+
+\newglossaryentry{cf:e}
+{% This entry goes in the ‘coordinateFrames’ glossary:
+type=coordinateFrames,
+name={$e$},
+text={$e$},
+description={Earth frame},
+sort={e}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%% General notation %%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Under a: Everything to do with general notation of states, parameters and measurements
+\newglossaryentry{not:refarea}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$A_{ref}$},
+text={$A_{ref}$},
+description={Reference area $(m^2)$ used for aerodynamic calculations.},
+sort={aa}}
+
+\newglossaryentry{not:dfef}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$d_{ref}$},
+text={$d_{ref}$},
+description={Reference diameter $(m)$ used for aerodynamic calculations.},
+sort={ab}}
+
+\newglossaryentry{not:airdensity}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\rho$},
+text={$\rho$},
+description={Air density $(kgm^{\text{-}3})$.},
+sort={ac}}
+
+\newglossaryentry{not:freestream}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m v_{\inf}$},
+text={$\m v_{\inf}$},
+description={Freestream velocity $(ms\inv)$.},
+sort={ad}}
+
+\newglossaryentry{not:cottocom}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\mathrm{COT\ to\ COM}$},
+text={$\mathrm{COT\ to\ COM}$},
+description={Distance from application of thrust force to centre of mass $(m)$.},
+sort={ae}}
+
+\newglossaryentry{not:angularv}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m \omega$},
+text={$\m \omega$},
+description={Angular velocity $(rads\inv)$.},
+sort={ag}}
+
+\newglossaryentry{not:moi}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m I$},
+text={$\m I$},
+description={Moment of inertia tensor $(m)$.},
+sort={ah}}
+
+\newglossaryentry{not:velocity}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m v$},
+text={$\m v$},
+description={Velocity $(ms\inv)$.},
+sort={ai}}
+
+\newglossaryentry{not:displacement}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m r$},
+text={$\m r$},
+description={Displacement $(m)$.},
+sort={aj}}
+
+\newglossaryentry{not:mass}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$m$},
+text={$m$},
+description={Mass (kg).},
+sort={ak}}
+
+\newglossaryentry{not:state}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m x_t$},
+text={$\m x_t$},
+description={State vector $\m x$ at time $t$.},
+sort={aa}}
+
+\newglossaryentry{not:meas}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m y_t$},
+text={$\m y_t$},
+description={Measurement vector $\m y$ at time $t$.},
+sort={ab}}
+
+\newglossaryentry{not:estimate}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m x_{n \mid m}$},
+text={$\m x_{n \mid m}$},
+description={The estimate of $\m x$ at time $n$ given observations up to and including at time $m \leq n$.},
+sort={ad}}
+
+\newglossaryentry{not:estimateGiven}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\hbx$},
+text={$\hbx$},
+description={Estimate of $\m x$.},
+sort={ae}}
+
+% Under b: Everything to do with general vectors / rotations in coordinate frames
+\newglossaryentry{not:quat}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\q^{nb}$},
+text={$\q^{nb}$},
+description={Unit quaternion representing the rotation to the $n$ coordinate system from the $b$ coordinate system.},
+sort={ba}}
+
+\newglossaryentry{not:rotMatrix}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m{R}^{nb}$},
+text={$\m{R}^{nb}$},
+description={Rotation matrix representing the rotation to the $n$ coordinate system from the $b$ coordinate system.},
+sort={bb}}
+
+\newglossaryentry{not:coordinatesysten}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\m x^n$},
+text={$\m x^n$},
+description={Vector $\m x$ expressed in the $n$ coordinate system.},
+sort={bc}}
+
+\newglossaryentry{not:derivativeframe}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$[\m x]^n$},
+text={$[x]^n$},
+description={A derivative $\m x$ that has been taken in the $n$ reference frame.},
+sort={bd}}
+
+\newglossaryentry{not:secondderivativeframe}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$[\m x]^{nn}$},
+text={$[\m x]^{nn}$},
+description={A derivative $\m x$ taken in the $n$ reference frame of a derivative that has been taken in the $n$ reference frame.},
+sort={be}}
+
+\newglossaryentry{not:angularvelocityframe}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$[\m \omega]^{bn}$},
+text={$[\m \omega]^{bn}$},
+description={The angular velocity of the $b$ frame with respect to the $n$ frame.},
+sort={be}}
+
+
+% Under c: Everything to do with sets
+\newglossaryentry{not:rotationset}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={\SO{3}},
+text={\SO{3}},
+description={Special orthogonal group in three dimensions.},
+sort={cb}}
+
+\newglossaryentry{not:element}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\in$},
+text={$\in$},
+description={Element of.},
+sort={cc}}
+
+% Under d: Everything to do with distributions
+\newglossaryentry{not:gaussian}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\mathcal{N}(\mu, \Sigma)$},
+text={$\mathcal{N}(\mu, \Sigma)$},
+description={Gaussian distribution with mean $\mu$ and covariance $\Sigma$.},
+sort={da}}
+
+\newglossaryentry{not:distr}
+{% This entry goes in the ‘notation’ glossary:
+type=notation,
+name={$\sim$},
+text={$\sim$},
+description={Distributed according to.},
+sort={df}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%  Operators %%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% a: Operations on scalars
+\newglossaryentry{op:argmin}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$\argmin$},
+text={$\argmin$},
+description={Minimizing argument.},
+sort={ab}}
+
+% b: Operations on vectors
+\newglossaryentry{op:dot}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$\m a \cdot \m b$},
+text={$\m a \cdot \m b$},
+description={Dot product of the vectors $\m a$ and $\m b$.},
+sort={ba}}
+
+\newglossaryentry{op:cross}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$\m a \times \m b$},
+text={$\m a \times \m b$},
+description={Cross product of the vectors $\m a$ and $\m b$.},
+sort={bb}}
+
+\newglossaryentry{op:mcross}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$[\m a]_\times$},
+text={$[\m a]_\times$},
+description={Cross product matrix of the vector $\m a$ as defined in~\eqref{eq:crossProductMatrix}.},
+sort={bc}}
+
+\newglossaryentry{op:twonorm}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$\norm{ \m a }$},
+text={$\norm{ \m a }$},
+description={Two-norm of the vector $\m a$.},
+sort={bd}}
+
+% c: Operations on matrices
+\newglossaryentry{op:trans}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$\m A\tran$},
+text={$\m A\tran$},
+description={Transpose of the matrix $\m A$.},
+sort={ca}}
+
+\newglossaryentry{op:inverse}
+{% This entry goes in the ‘notation’ glossary:
+type=operators,
+name={$\m A\inv$},
+text={$\m A\inv$},
+description={Inverse of the matrix $\m A$.},
+sort={cb}}
+
+% c: Operations on quaternions
+\newglossaryentry{op:qmult}
+{% This entry goes in the operators �glossary:
+type=operators,
+name={$\otimes$},
+text={$\otimes$},
+description={Quaternion multiplication},
+sort={db}}
+
+%\glsaddall%[types={notation,coordinateFrames,operators}]

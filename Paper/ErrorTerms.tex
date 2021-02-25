@@ -1,0 +1,72 @@
+\label{subsec:ErrorTerms}
+\subsection{Error Terms}
+Closed loop control requires error terms or the variable being controlled and setpoint to be fed in.
+Calculating the error term for quaternions is not as simple for other variables so the error terms that can be used will be presented here.
+
+When using feedback control a error term is commonly used.
+Even though state space methods typically forgo this instead opting to add a multiple of the reference to the input directly, we will use an error term as the state size and input size are not the same.
+
+The quaternion error is defined as the rotation from the desired orientation to the current orientation.
+\begin{align}
+    \q^{en} &= \q^{bd} = \q^{bn} \otimes \q^{nd}
+\end{align}
+
+If the roll angle is not being controlled, e.g. because roll angular velocity is being controlled instead or because there is no control on the roll axis, the error term should not describe a rotation where control on the roll axis would be needed.
+This error term, $\q^{re}$, can be obtained as follows.
+\begin{align}
+     \\
+    \q^{en} &= \q^{er} \otimes \q^{rn} \\
+    \begin{bmatrix}
+        w \\
+        i \\
+        j \\
+        k
+    \end{bmatrix} &= \begin{bmatrix}
+        \cos \theta / 2 \\
+        x \sin \theta / 2 \\
+        y \sin \theta / 2 \\
+        0
+    \end{bmatrix} \otimes
+    \begin{bmatrix}
+        \cos \alpha / 2 \\
+        0 \\
+        0 \\
+        \sin \alpha / 2
+    \end{bmatrix} \\
+    &= \begin{bmatrix}
+        \cos \theta / 2 \cos \alpha / 2 \\
+        x \sin \theta / 2 \cos \alpha / 2 + y \sin \theta / 2 \sin \alpha / 2 \\
+        x \sin \theta / 2 \sin \alpha / 2 + y \sin \theta / 2 \cos \alpha / 2 \\
+        \cos \theta / 2 \sin \alpha / 2 \\
+    \end{bmatrix} \\
+    \frac{k}{w} &= \tan \frac{\alpha}{2}\\
+    \frac{\alpha}{2} &= \arctan \frac{k}{w} \\
+    \q^{re} &= \q^{rn} \otimes \q^{ne}
+\end{align}
+
+To obtain the shortest rotation, the rotation that is less than or equal to $180\degree$, the negative of the quaternion should be used if the rotation is greater than $180\degree$.
+\begin{align}
+    \q &= 
+    \begin{dcases}
+       \q  & \text{if } \q_w \geq 0 \\
+       -\q & \text{otherwise.}
+    \end{dcases}
+\end{align}
+
+
+The error term used typically is 3d perhaps because this decreases size of state space representation and the scalar term provides no additional information.
+There are multiple different options proposed such as $\qv$, $R\{q\}\qv$, $2 * \q_w * \qv$ or $2 \log \q$ in~\cite{Bla2010, dewolf2019, Caccavale1998}.
+
+The dynamics of $\qv$ are easy to obtain from the dynamics of $\q$ which are usually known.
+
+$R^{bn}\qv^{bn}$ has tracking performance that is as good as using the euler angle parameterisation of $\q^{nb} \otimes \q^{dn}$ which describes the desired orientation in the body reference frame.
+A further advantage is represented by the contained computational burden.
+
+$2 * \q^{bn}_w * \qv^{bn}$ performs worse than $R^{bn}\qv^{bn}$ for large orientation errors but similarly for small orientation errors. Its computational burden is lower than $R^{bn}\qv^{bn}$.
+The quaternion here will be limited to rotations in the interval $(-\pi, \pi)$ otherwise the norm will decrease as rotation increases in the interval $(\pi, 2\pi)$.
+Additionally describing the dynamics of the state including this term will be more complicated than $\qv^{bn}$.
+
+$2 \log \q^{bn}$ is an axis angle parameterisation of $\q^{bn}$.
+The magnitude of the error term is therefore equal to the error angle so a larger control output is given for larger errors, which is ideal.
+
+The error term $\qv^{bn}$ will be used as its dynamics are simple and the error term is simple.

@@ -1,0 +1,32 @@
+\subsection{Linear Quadratic Regulator}
+\label{subsec:LQR}
+
+To obtain a \gls{lqr} controller a \gls{lti} state space representation has to be used. 
+These are the operating points used to linearise the model, as these are the expected values for the control period, as well as the mean of $\mathrm{Thrust}$ and $\m{I}$
+\begin{align}
+    [\m \omega^b]^{bn} &= \begin{bmatrix}
+        0 & 0 & 0
+    \end{bmatrix}\tran \\
+    \m u(t) &= \begin{bmatrix}
+        0 & 0 & 0
+    \end{bmatrix}\tran \\
+    \q &= \begin{bmatrix}
+        1 & 0 & 0 & 0
+    \end{bmatrix}\tran
+\end{align}
+These are the ranges that will be used for gain scheduling, where the first and last terms are the first term and last terms in the range and the middle term is the difference between each term in the range:
+\begin{align}
+    \mathrm{Thrust} &= 0.5:7:28.5 \\
+    \q_i &= \q_j = -0.7:0.1:0.7
+\end{align}
+$\q_z$ is not included as this should stay close to 0 for our purposes and this would limit the ranges of $\q_i$ and $\q_j$.
+
+Each controller will be an infinite horizon \gls{lqr} controller with four variants that are continuous or discrete and gain scheduled or not gain scheduled.
+
+An \gls{attitude} controller can be designed using~\modelref{Attitude Model} and~\modelrefnocomma{No Time Delay Actuator}.
+
+An \gls{attitude} controller accounting for the actuator time delay can be designed using~\modelref{Attitude Model} and~\modelrefnocomma{No Saturation Actuator}.
+
+A horizontal velocity controller can be designed using~\modelref{Position Model} and~\modelrefnocomma{No Time Delay Actuator}.
+
+A horizontal velocity controller accounting for the actuator time delay can be designed using~\modelref{Position Model} and~\modelrefnocomma{No Saturation Actuator}.

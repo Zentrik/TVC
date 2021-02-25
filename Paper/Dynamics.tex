@@ -1,0 +1,25 @@
+\section{Dynamics}
+\label{sec:Dynamics}
+
+The dynamics of the rocket have to be derived in order to simulate the system (the rocket being controlled) so that the performance of each \gls{gnc} scheme can be compared. 
+Additionally, the system dynamics are required to develop/ tune the \gls{gnc} schemes, which is where the simpler models will be used to deal with the limitation of different types of \gls{gnc} schemes.
+
+A review of the dynamics used to model similar systems, such as quadcopters and other model rockets, revealed that the prominent differences between the different methods were: the reference frames and coordinate systems used; the rotation formalism used, commonly a choice between euler angles or quaternions; and the value of the aerodynamic coefficients.
+Additionally, it shows that a common way to model a model rocket is to assume it is a rigid body, when the body does not deform under the action of applied forces, and to use 6DOF equations of motion.
+
+The reference frames and coordinate systems used make no difference to the accuracy of the simulation and as such those which reduce the computational effort of the simulation and simplify the analysis of the model are being used.
+
+It is shown in~\cite{Stu1964} that all three dimensional parameterisations of \SO{3} have singularities or discontinuities however, \glspl{mrp} have a singularity at $360\degree$ and so switching to the shortest rotation the singularity can be avoided.
+Therefore the choice of rotation formalism used can affect the accuracy of the simulation if a singularity is encountered, which is present in the popular euler angle parameterisation.
+Additionally, euler angles `are less accurate than quaternions when used to integrate incremental changes in \gls{attitude} over time'~\cite{Representing}.
+Also, quaternions are more computationally efficient, which will be important when implemented on a microcontroller, and so will be used instead of euler angles even though they are arguably less intuitive.
+
+There are many different methods to calculate aerodynamic coefficients, falling under three categories: \gls{cfd}; theoretical and empirical formulae; and wind tunnel testing.
+The preliminary results obtained from SolidWorks Fluid Simulation were inaccurate as they did not fit with empirical data and so \gls{cfd} was deemed to be unsuitable for the calculation of aerodynamic coefficients.
+Two common pieces of software used to calculate the aerodynamic coefficients using formulae are USAF Digital DATCOM and OpenRocket,~\cite{OR}.
+A brief comparison of the coefficients produced by both software led me to believe that OpenRocket was more accurate as DATCOM used a linear relationship for the pitching moment coefficient, which would seem to be an oversimplification especially when compared to empirical data.
+Also, OpenRocket's simulation was compared to empirical data from model rockets and was found to be reasonably accurate and its assumptions are mostly true for our case.
+Wind tunnel testing was not available and so was not considered.
+So OpenRocket will be used to calculate the aerodynamic coefficients which should be indicative of their real world performance allowing for comparison between different controllers.
+
+The following dynamics are derived in the navigation frame and the earth is assumed to be flat.

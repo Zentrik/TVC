@@ -1,0 +1,72 @@
+\subsection{Coefficients} \label{subsec:Coefficients}
+~\cite{OR}
+planform area of ellipsoid nose cone is $ \frac{d l \pi}{4}$ \\
+Planform Area of Conical Nose cone is $ \pi r l$ \\
+Planform Area of Cyclinder is $ 2 r l$ \\
+Reference Area is $ \pi r^2 $
+
+\begin{align}
+    C_{N} &= \sum_{i \in Components} K \frac{A_{plan}}{A_{ref}} \mathrm{cnmul}\sin^2\alpha + \frac{2 \sin\alpha}{A_{ref}} [A(l)-A(0)] \\ \\
+    &= C_{N}^{Body\ Tube} + C_{N}^{Nose\ Cone} \\
+\end{align}
+
+\begin{align}
+    mul &= 3 \left( \frac{0.275 * \bar{d}}{A_{ref} * d_{ref}} * 0.95^4 \right) \\
+    C_{m\ damping} &= min \left( \sum_{i \in Components} \frac{C_N * CP_x}{l}, mul * \frac{\omega_y^2}{\norm{\m v_\inf}^2} \right) * \operatorname{sign}(\omega_y)\\
+    C_m &= \left( \sum_{i \in Components} \frac{C_N * CP_x}{d_{ref}} \right) - \frac{C_N * CM_x}{d_{ref}} - C_{m\ damping}
+\end{align}  
+
+~\cite{fleeman_2006}
+\begin{equation}
+    \begin{split}
+    C_{base} = 
+        \begin{cases}
+          0.12+0.13M^2 & \mbox{if $M<1$} \\
+          0.25/M       & \mbox{if $M>1$}
+        \end{cases}
+    \end{split}
+\end{equation} 
+
+\begin{align}
+    C_{pressure} = 0.8 \frac{d_{ref}}{2 \sqrt{\frac{d_{ref}{2}^2 + l^{Nose\ Cone}^2}}
+\end{align}
+
+\begin{align}
+    Cfc1 = (\frac{3}{2} \ln{Reynolds} - 5.6)^{text{-}2} \\
+    1 - \frac{mach^2}{10} \\
+    \max(Cfc1, 0.032 )
+\end{align}
+
+\begin{equation}
+    \begin{split}
+        C_s &= 0 \\
+        C_y &= 0 \\
+        C_l &= 0
+    \end{split}
+\end{equation}
+
+\begin{align}
+    \m v_\infty = [\m v^n]^n + v_{wind}
+\end{align}
+
+\begin{align}
+		\alpha = 
+    		 \begin{cases} 
+        		 0 & \text{if $v_\infty = 0$} \\
+        		 \arccos \left( \frac{ v_{\infty_z}}{\norm{\mid v_\infty}} \right) & \text{otherwise.}
+    		 \end{cases}
+\end{align}
+
+\begin{equation}
+    \begin{split}
+        length &= \sqrt{v_{\infty_x}^2 + v_{\infty_y}^2} \\
+        sin &= \frac{v_{\infty_y}}{length} \\
+        cos &= \frac{v_{\infty_x}}{length} \\
+        \mathbf{Rot} &= 
+        \begin{bmatrix}
+            cos & -sin & 0 \\
+            sin & cos & 0 \\
+            0 & 0 & 1
+        \end{bmatrix}
+    \end{split}
+\end{equation}

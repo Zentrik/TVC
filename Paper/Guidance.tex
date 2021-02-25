@@ -1,0 +1,103 @@
+\section{Guidance} 
+\label{sec:Guidance}
+
+Guidance refers to the generation of a trajectory in order to achieve a goal such as \gls{vtvl}, where a trajectory is useful in determining how to land safely.
+This is necessary as without a trajectory the rocket would not know how to land safely or achieve any other goal and therefore would likely fail at achieving this goal.
+There are existing guidance algorithms for \gls{vtvl} in rockets, such as GFOLD~\cite{Aci2007, Aci2013,Bla2010} or solutions to the moon soft landing problem, which generate an optimal trajectory to land a rocket whilst typically minimising fuel consumption.
+However, these algorithms are unsuitable as a solid motor is going to be used so the fuel use is not a variable which can be optimised.
+%
+\subsection{Optimal Motor Ignition Time}
+
+A novel algorithm is proposed, which can be used to determine an optimal motor ignition time that minimizes the impact velocity with the ground, ensuring the least damage to the rocket on landing, when a simple trajectory, which minimises horizontal velocity, is used.
+
+During the powered portion of the flight, weight and thrust are taken to be the only forces acting on the rocket and thus the dynamics of the rocket are:
+Let $x^n$ be the height of the rocket and $x^n = 0$ be when the rocket is touching the ground
+\begin{align}
+    [\ddot{x}^n]^{nn}(t) &= \mathrm{Thrust}(t - \gamma) m\inv -g \\
+    t &\in \{a: 0 \leq a \leq b\} \text{ where } s(b) = 0
+\end{align}
+
+The optimisation problem to be solved is thus $\argmin\limits_\gamma \abs{[\dot{x}^n]^n(b)}$ subject to $b \geq \mathrm{burn\ time}$ (taken to be $3.45$), where the speed at which the rocket hits the ground is minimised with respect to $\gamma$ when the motor is expended.
+When the rocket hits the ground before $\mathrm{burn\ time}$ the landing is considered a fail as the rocket's dynamics would be hard to model and could result in dangerous behaviour.
+There are many different ways to solve this.
+
+One method is to first sample $\abs{[\dot{x}^n]^n(b)}$ subject to $b \geq \mathrm{burn\ time}$ for a range of initial conditions, $[\dot{x}^n]^n(\gamma)$ and $x^n(\gamma)$. Then using nearest neighbour interpolation and extrapolation, as other methods such as linear, cubic, makima resulted in noisy data and curve fitting with polynomials and neural networks were not a close enough fit to the data, the optimisation problem can be solved for a range of initial conditions, $[\dot{x}^n]^n(0)$ and $x^n(0)$.
+
+\setlength\fwidth{0.8\textwidth}
+\setlength\fheight{0.4 \textheight}
+\setlength\wwidth{0.7 \textwidth}
+\setlength\wheight{0.3 \textheight}
+%TC:ignore
+%\begin{center}
+%    \input{Images/MaxImpactVelocity.tikz}%
+%    \input{Images/MaxImpactVelocityHeatmap.tikz}
+%\end{center}
+
+\begin{figure}[h]
+    \centering
+    \input{Images/MaxImpactVelocity.tikz}
+    \caption{Surface showing speed at which rocket will hit the ground for a range of initial conditions, $[\dot{x}^n]^n(\gamma)$ and $x^n(\gamma)$}
+    \label{fig:1}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \input{Images/MaxImpactVelocityHeatmap.tikz}
+    \caption{Heatmap showing speed at which rocket will hit the ground for a range of initial conditions, $[\dot{x}^n]^n(\gamma)$ and $x^n(\gamma)$}
+    \label{fig:2}
+\end{figure}
+%\begin{figure}[h]
+%    \begin{subfigure}[b]{0.4 \textwidth}
+%        \input{Images/MaxImpactVelocity.tikz}
+%        \caption{Surface showing speed at which rocket will hit the ground}
+%        \label{fig:1}
+%    \end{subfigure}
+%    %
+%    \hspace{0.14 \textwidth}
+%    \begin{subfigure}[b]{0.4 \textwidth}
+%        \input{Images/MaxImpactVelocityHeatmap.tikz}
+%        \caption{Heatmap showing speed at which rocket will hit the ground}
+%        \label{fig:2}
+%    \end{subfigure}
+%\end{figure}
+%TC:endignore
+Alternatively, the optimisation problem can be solved directly for a range of $\dot{x}(0)$ and $x(0)$ using an ODE solver to calculate $\abs{\dot{x}(b)}$ during optimisation. 
+This provides better accuracy, however this is significantly slower than evaluating the interpolation function which can be generated very quickly in MATLAB.
+
+When $\gamma < constant$, the motor should be ignited, so the region $\gamma < constant$ is approximated in order to facilitate the online calculation of gamma at a frequent rate to allow for deviations from the model of the dynamics, e.g. due to aerodynamic forces or due to an ideal 1D case being used.
+The use of $constant$ accounts for a delay in the motor ignition.
+
+As shown by figure~\ref{fig:1} and~\ref{fig:2} the speed at which the rocket will hit the ground is not $0\ m/s$ except in specific cases and so more advanced algorithms, that generate a more complex trajectory where the rocket does not simply try to minimise horizontal velocity, could improve on this algorithm.
+
+\subsection{Landing Trajectory Optimisation} 
+\label{subsec:TrajectoryOptimisation}
+
+A novel algorithm for landing trajectory optimisation using solid motors is proposed:
+\begin{align}
+    \m \theta &= [\theta_1 \ ... \ \theta_n] \\
+    \m \phi &= [\phi_1 \ ... \ \phi_n] \\
+    \theta_1, \phi_1 &\text{ describe the current orientation of the rocket} \\
+    \m u_n &= \begin{bmatrix}
+        \sin \theta_n \cos \phi_n \\
+        \sin \theta_n \sin \phi_n \\
+        \cos \theta_n
+    \end{bmatrix} \\
+    \theta_n &= 0,\ \phi_n = 0 \text{ to land upright.} \\
+    \arccos \frac{\m u_{n+1} \cdot \m u_n}{\Delta t} &\leq \m \omega_{max}\\
+    [\ddot{\m x}^n]^{nn}(t) &= \m u(t) \frac{\mathrm{Thrust}(t)}{m(t)} + \begin{bmatrix}
+        0 \\
+        0 \\
+        -g
+    \end{bmatrix} \\
+    \m \theta, \m \phi &= \argmin_{\m \theta, \m\phi} \norm{ [\dot{x}^n]^n(t) }, \text{ where } x^n(t) = 0
+\end{align}
+$\m \theta, \m \phi, \m u$ are are discrete vectors which are linearly interpolated between to obtain $\m \theta(t), \m \phi(t), \m u(t)$.
+A constraint on the maximum angular velocity of the rocket is enforced to ensure the rocket is able to rotate to the desired orientation in time.
+This algorithm is too slow for real time use, however through convexification and the offline computation of trajectories real time use could be possible.
+An optimal time to ignite the motors using this algorithm could be approximated by the using the result from the previous algorithm.
+
+
+If an \gls{attitude} controller is being used, a guidance algorithm can be used to generate an \gls{attitude} trajectory in order to control $[\m v^n_{x,y}]^n$ or $\m r^n_{x,y}$. 
+A \gls{pid} controller can be used to generate an acceleration command from an error term, which can be used to calculate the desired \gls{attitude} and angular velocity. 
+The desired angular velocity may be taken to be 0 as it could provide better performance that taking it to be $2 \log \q$.
+
+The algorithms presented in this section should be able to generate trajectories which are sufficient for the purpose of \gls{vtvl} however, future work will be needed to verify this.

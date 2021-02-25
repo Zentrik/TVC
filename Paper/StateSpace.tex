@@ -1,0 +1,95 @@
+\subsection{State Space}
+\label{sec:StateSpace}
+
+A state space representation is when a system is described using first order differential or difference equations. To express a continuous state space representation in matrix vector form the equations must be linear:
+\begin{align}
+    \dot{\m x}(t) &= \m A(t)\m x(t) + \m B(t) \m u(t) \\
+    \m y(t) &= \m C(t)\m x(t) + \m D(t) \m u(t)
+\end{align}
+Most controllers require \gls{lti} systems which are described as such in a state space representation if described using differential equations:
+\begin{align}
+    \label{eq:ltistate}
+    \dot{\m x}(t) &= \m A \m x(t) + \m B \m u(t) \\
+    \label{eq:ltioutput}
+    \m y(t) &= \m C \m x(t) + \m D \m u(t)
+\end{align}
+If the state space system is implemented on a digital system, if the actuators are discrete or difference equations are used the state space system may be described in a discrete representation.
+The \gls{lti} discrete state space representation is expressed as such:
+\begin{align}
+    \m x_{k+1} &= \m A \m x_k + \m B \m u_k \\
+    \m y_k &= \m C \m x_k + \m D \m u_k
+\end{align}
+
+To convert from a time varying state space representation to a time invariant representation, the representation at an operating point can be taken to hold for the entire range of values.
+Typically, the equilibrium points are used as the system is likely to stabilize around that point~\cite{MITFEEDBACK}. This means the state will be close to the equilibrium point most of the time so the representation stays reasonably accurate. 
+This has disadvantages, e.g. if the state deviates from the operating points for extended periods or for a short time if the plant is strongly non-linear the \gls{lti} representation will be inaccurate.
+
+Many systems are non-linear, so to apply linear techniques such as \gls{lqr} non-linear models need to be linearised about operating points $\bar{\m x}, \bar{\m u}, \bar{\m y}$. 
+We often wish to use linear techniques as they are simpler, linear control theory is more developed than non-linear control theory and control designers will have more knowledge about linear techniques.
+Additionally, non-linear control techniques are typically only useful for certain non-linear systems whilst linear techniques can work for a wide range of systems.
+A non-linear system expressed as:
+\begin{align}
+    \dot{\m x}(t) &= f(\m x(t), \m u(t), \bullet) \\
+    \m y(t) &= g(\m x(t), \bullet)
+\end{align}
+Can be linearised as such~\cite{Bla2010}:
+\begin{align}
+    \tilde{\m x} &= \m x - \bar{\m x} \\
+    \tilde{\m u} &= \m u - \bar{\m u} \\
+    \tilde{\m y} &= \m y - \bar{\m y}
+\end{align}
+The taylor series expansion of $\dot{x}$ and $y$ are as follows:
+\begin{align}
+    \dot{\m x} &= f(\bar{\m x}, \bar{\m u}, \bar{\bullet}) + \frac{\partial f(\bar{\m x}, \bar{\m u}, \bar{\bullet})}{\partial \m x} \tilde{\m x} + \frac{\partial f(\bar{\m x}, \bar{\m u}, \bar{\bullet})}{\partial \m u} \tilde{\m u} \dots \\
+    \m y &= g(\bar{\m y}, \bar{\bullet}) + \frac{\partial g(\bar{\m y}, \bar{\m u}, \bar{\bullet})}{\partial \m y} \tilde{\m y} + \frac{\partial g(\bar{\m y}, \bar{\bullet})}{\partial \m u} \tilde{\m u} \dots
+\end{align}
+To obtain a linear state system use only the first order terms.
+\begin{align}
+    \dot{\tilde{\m x}} &= \frac{\partial f(\bar{\m x}, \bar{\m u}, \bar{\bullet})}{\partial \m x} \tilde{\m x} + \frac{\partial f(\bar{\m x}, \bar{\m u}, \bar{\bullet})}{\partial \m u} \tilde{\m u} \\
+    \tilde{\m y} &= \frac{\partial g(\bar{\m y}, \bar{\bullet})}{\partial \m y} \tilde{\m y} + \frac{\partial g(\bar{\m y}, \bar{\bullet})}{\partial \m u} \tilde{\m u}
+\end{align}
+
+In order to obtain better performance, gain scheduling can be used where multiple operating points are chosen to generate linear controllers.
+Depending on the current state, controllers can be appropriately selected or interpolated between.
+
+Time delays present in a system may be approximated using a padé approximation which may add additional states and so a state observer or estimator is also required.
+
+A system is observable if the current state can be estimated using the output for all possible states and control vectors.
+A state space system of the form \eqref{eq:ltistate}, \eqref{eq:ltioutput} is observable if the rank of $\m{\mathcal{O}}$ is the same as the number of state variables \cite{fri2005}.
+\begin{align}
+    \m{\mathcal{O}} = \begin{bmatrix}
+        \m C \\
+        \m C \m A \\
+        \m C \m A^2 \\
+        \vdots \\
+        \m C \m A^{n-1}
+    \end{bmatrix}
+\end{align}
+
+A system is controllable if any state can be achieved from any initial state in a finite time.
+A state space system of the form \eqref{eq:ltistate}, \eqref{eq:ltioutput} is controllable if the rank of $\m \zeta$ is the same as the number of state variables \cite{fri2005}.
+\begin{align}
+    \m \zeta = \begin{bmatrix}
+        \m B \\
+        \m A \m B \\
+        \m A^2 \m B \\
+        \vdots \\
+        \m A^{n-1} \m B
+    \end{bmatrix}
+\end{align}
+
+A system can be controlled using \gls{lqr} or pole placement if the \gls{lti} state space representation is controllable.
+Pole placement and \gls{lqr} are similar as they both set the eigenvalues of the system, which determines the system's dynamics and so stability. 
+However, pole placement is given eigenvalues whilst \gls{lqr} determines the optimal eigenvalues and gain matrix, $\m K$, minimising the quadratic cost function, $J$, where $\m u = -\m K \m x$ and $\dot{ \m x } = (\m A - \m B \m K) \m x$~\cite{fri2005}.
+
+The infinite-horizon, continuous-time \gls{lqr} defines the cost, $J$, as \begin{align}
+    J = \int_{0}^{\infty} (\m x\tran \m Q \m x + \m u\tran \m R \m u + 2 \m x\tran \m N \m u) \,\mathrm{d}t.
+\end{align}
+The infinite-horizon, discrete-time \gls{lqr} defines the cost, $J$, as 
+\begin{align}
+    J = \sum_{k = 0}^{\infty} (\m x_k\tran \m Q \m x_k + \m u_k\tran \m R \m u_k + 2 \m x_k\tran \m N_k \m u).
+\end{align}
+$\m K$ can be found using the algebraic Riccati equation.
+
+Additionally, more advanced controllers can be used that are designed for non-linear, time varying systems or that can account for constraints, such as iLQR or \gls{mpc}, can be designed using a state space model.
+However, these are more computationally expensive than pole placement and \gls{lqr} and may be less robust.
