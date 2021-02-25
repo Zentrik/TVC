@@ -1,4 +1,5 @@
 Rocket/roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from Rocket/StateSpaceController.m.
+
 The gain scheduled controllers may be incorrect as I linearised about points which are not in equilbrium, which I don't think you are supposed to do.
 If I get the time, I will add a TVLQR, try to implement partial feedback linearisation and fix the guidance MPC.
 
