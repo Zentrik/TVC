@@ -1,0 +1,95 @@
+\section{Models} \label{sec:Models}
+%
+In this section, different models of varying complexities will be proposed as applications, such as \gls{lqr}, require modifications of the model derived in the previous section,~\fullrefnocomma{sec:Dynamics}.
+%
+\subsection{First Model}
+This is the most accurate model of the system which will be used in the simulation to evaluate the performance of a proposed \gls{gnc} scheme.
+\begin{align}
+    [\dot{\m \omega^b}]^{bn} &= (\m I^b)\inv ( \mathbf{AeroMoments} + \mathbf{Actuator\ Moments}(t) - [\m \omega^b]^{bn} \times \m I^b [\m \omega^b]^{bn} ) \\
+    \label{eq:qdot}
+    \dot{\q}^{bn} &=\frac{1}{2} \q^{bn}
+    \begin{bmatrix}
+        0 & [\m \omega^b]^{bn}
+    \end{bmatrix}\tran \\
+    [\dot{\m v}^n]^{nn} &= \m R^{nb} m\inv \left( \mathbf{AeroForces}^b + \mathbf{Thrust}^b \right) +
+    \begin{bmatrix}
+        0 & 0 & -g
+    \end{bmatrix}\tran \\
+    \label{eq:rdot}
+    [\dot{\m r}^n]^n &= [\m v^n]^n 
+\end{align}
+%
+\subsection{Second Model} 
+\label{Position Model}
+This model is for used for translational control using linear techniques such as \gls{lqr}.
+
+As little translational control can be achieved in the z axis and it would be difficult to incorporate this into state space form, so the z axis is not included. 
+Therefore, the weight force is omitted.
+Additionally the quaternion error term, $\qv$ is used instead of $\q$. 
+The choice of $\qv$ is explained in \fullref{subsec:ErrorTerms}.
+\begin{align}
+    \label{eq:alpha}
+    [\dot{\m \omega^b}]^{bn} &= (\m I^b)\inv (\mathbf{Actuator\ Moments}(t) - [\m \omega^b]^{bn} \times \m I^b [\m \omega^b]^{bn} ) \\
+    \label{eq:qdotv}
+    \dot{\q}^{bn}_v &= \left( \frac{1}{2} \q^{bn}
+    \begin{bmatrix}
+        0 & [\m \omega^b]^{bn}
+    \end{bmatrix}\tran\right)_v\\
+    \label{eq:qintv}
+    \frac{d}{dt} \int \q^{bn}_v &= \q^{bn}_v \\
+    [\dot{\m v}^n_{x,y}]^{nn} &= \left( \m R^{nb} m\inv \mathbf{Thrust}^b \right)_{x,y}\\
+    [\dot{\m r}^n_{x,y}]^n &= \m v^n_{x,y}
+\end{align}
+%
+\subsection{Third Model} 
+\label{Attitude Model}
+This model is for used for \gls{attitude} control using linear techniques such as \gls{lqr} and is based on the previous model, \modelref{Position Model} so \crefrange{eq:alpha}{eq:qintv} are used.
+%
+\subsection{Fourth Model} 
+\label{KF Model}
+This model, in contrast to the \modelref{Position Model} includes the translation variables in the z axis and $\q_w$ so that it can be used to build a state estimator or observer.
+Let the gyroscope bias be $\m \omega_b$ and the accelerometer bias $\m a_b$.
+
+Using equations~\eqref{eq:qdot},~\eqref{eq:rdot},~\eqref{eq:alpha}
+\begin{align}
+    \dot{\m \omega^b}_b &= 0\\
+    \dot{\m a}^b_b &= 0 \\
+    [\dot{\m v}^n]^{nn} &= \m R^{nb} m\inv \mathbf{Thrust}^b + 
+    \begin{bmatrix}
+        0 & 0 & -g
+    \end{bmatrix}\tran  \\
+\end{align}
+%
+\subsection{Fifth Model} 
+\label{Accurate Actuator}
+Different actuator models are needed, e.g. for controllers which take into account the time delay in the actuator and those that don't. 
+
+This model is the most accurate model of the system and will be used in the simulation to evaluate the performance of a proposed \gls{gnc} scheme.
+
+\Crefrange{eq:Actuator1}{eq:Actuator4} describe this model.
+%
+\subsection{Sixth Model} 
+\label{No Saturation Actuator}
+This actuator model ignores the saturation and can be continuous or discrete with any sample time by appropriately modifying \eqref{eq:Actuator1} and \eqref{eq:Actuator4}.
+
+This model is appropriate for controllers that cannot be tuned/ developed with models including saturation terms such as a \gls{lqr} or \gls{pid} controller.
+
+Using equations~\eqref{eq:Actuator1},~\eqref{eq:Actuator3},~\eqref{eq:Actuator4} 
+\begin{align}
+    \label{eq:noSaturationActuator}
+    \aforce &= \fm f(t)
+\end{align}
+%
+\subsection{Seventh Model} 
+\label{No Time Delay Actuator}
+This actuator model additionally assumes that there is no time delay in the actuators compared to the~\modelrefnocomma{No Saturation Actuator}.
+
+Using equations~\eqref{eq:noSaturationActuator} and~\eqref{eq:Actuator4}.
+\begin{align}  
+    \label{eq:ActuatorSimple1}
+    \fm f(t) &= \cotto\inv\begin{bmatrix}
+        - u_y(t) \\
+         u_x(t)
+    \end{bmatrix} \\
+    \amom &= \m u(t)
+\end{align}

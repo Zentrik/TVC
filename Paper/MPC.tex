@@ -1,0 +1,22 @@
+\subsection{Model Predictive Control}
+
+\gls{mpc} numerically solves for an optima of the cost function over a time horizon, typically short, subject to hard constraints and then returns the control input at the current time step $k$. 
+If the optimisation problem is convex the global optimum will be found otherwise a optima will be found with no guarantee that it is the global optimum.
+It is possible to achieve stability without requiring the globally optimum solution~\cite{Gor2004}.
+\gls{mpc} is computationally more expensive than \gls{lqr} and may give suboptimal solutions as the time horizon is typically shorter than the whole horizon and the global minimum may not be found for non-convex problems.
+However, \gls{mpc} can handle non-linear systems and hard constraints and allows for custom cost functions unlike controllers such as \gls{lqr}. 
+
+\gls{mpc} has many advantages over other controllers, including but not limited to: ease of use and tuning; quick to develop and modify; explicitly handles constraints and a model~\cite{Raw2017}.
+
+The theory about tuning \glspl{mpc} requires large prediction horizons or a terminal constraint.
+Adding a terminal state constraint to \gls{mpc} leads to the \gls{mpc} being equivalent to an infinite horizon \gls{lqr} controller.
+Also, performance can be usually improved with a terminal cost function~\cite{Gor2004}.
+
+\gls{mpc} control is only discrete however, as it is typically implemented digitally this is desired. 
+
+\glspl{mpc} controllers that are equivalent to \glspl{lqr} controllers will not be designed as they are unlikely to provide any benefit as only a constant constraint on the controller's output will be present and it is unlikely to be enforced and \gls{mpc} will more computationally taxing than \gls{lqr}.
+
+A linear \gls{mpc} using~\modelref{Attitude Model} and both~\modelref{No Saturation Actuator} and~\modelref{No Time Delay Actuator} will be designed.
+The linearisation will take place using the same operating points as in~\fullrefnocomma{subsec:LQR}.
+
+A non-linear \gls{mpc} using~\modelref{Attitude Model} and~\modelref{Accurate Actuator} will also be designed.

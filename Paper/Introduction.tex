@@ -1,0 +1,34 @@
+\section{Introduction}
+In this paper we compare different guidance, navigation and control (\gls{gnc}) schemes to achieve vertical take off/ vertical landing (\gls{vtvl}), which is where a rocket takes off and lands propulsively. 
+\gls{vtvl} reusable launch vehicles (\glspl{rlv}) have become very popular in the last decade with the successful landings and subsequent reuse of Space X’s Falcon-9 and Blue Origin’s New Shepard. 
+These rockets can be reused easily as having \gls{vtvl} capabilities allows for precise landing, without this the rocket would likely land in the sea which would cause significant damage and so would need to repaired before reuse.
+Therefore implementing \gls{vtvl} in other rockets, such as Rocket Lab's Electron, would significantly reduce costs and waste, allowing for cheaper launches and so significant innovation in areas such as small satellites or planetary soft landing. Planetary soft landing is where rockets land on extraterrestrial planets without  significant damage to the vehicle or its payload.
+This requires a solution to the power descent guidance problem for pinpoint landing, `defined as finding the fuel optimal trajectory that takes a lander with a given initial state (position and velocity) to a prescribed final state in a uniform gravity field, with magnitude constraints on the available net thrust, and various state constraints'~\cite{Aci2005}.
+This allows for landing near scientifically interesting targets or supplies, like fuel, in dangerous terrain or whilst avoiding other important objects. 
+
+With the newfound popularity of \gls{vtvl} \glspl{rlv}, model rocket enthusiasts wish to achieve \gls{vtvl} with model rockets, in order to better emulate them. 
+So, achieving \gls{vtvl} with model rockets would provide a testing bed from which \gls{vtvl} can be achieved in rockets, such as the Electron, and it will provide enjoyment to model rocket enthusiasts.
+
+There are many existing papers outlining control on small scale rockets, however many only focus on \gls{attitude} control~\cite{Kisabo2019, Kehl2015, Sumathi2014}, which is insufficient for \gls{vtvl} and for most uses of rockets, such as the insertion of satellites into orbit. 
+This is due to the fact that translational motion is not controlled; when landing the velocity of the rocket has to be minimal otherwise it will be damaged and may damage people and the surrounding areas. 
+Also, when delivering a satellite, it is desired that they are placed into a certain orbit or position by the rocket and therefore the translational motion has to be controlled. 
+So this paper presents full \gls{gnc} schemes that can control both translational and rotational motion in order to achieve \gls{tvc}.
+These different schemes can be broadly grouped depending on whether they are linear or non-linear.
+A mix of linear and non-linear techniques are presented for guidance and control, including \gls{pid}, state space and \gls{mpc}. 
+Non linear techniques are also used for state estimation, an \gls{ekf}, for navigation.
+I hypothesise that non-linear techniques will perform better than linear techniques based on the criteria: the new dynamics of the system; the robustness of the controller and safety.
+
+Existing research typically uses linear techniques;~\cite{Kehl2015} shows a \gls{pid} controller being used to control the roll axis using a reaction wheel effectively up to the point of saturation.
+The control on the pitch and yaw axis using \gls{tvc} however has a rather large settling time in excess of 4s and possibly a steady state error, however insufficient data is presented, e.g. data with larger impulses and for a greater time is needed.
+
+\cite{Kisabo2019} shows how a \gls{lqg} controller can perform worse than a \gls{lqr} controller for \gls{attitude} control and proposes a novel controller to solve this problem and improve performance.
+
+\cite{Sumathi2014} proposes a non-linear controller, a fuzzy \gls{pid} controller, with no overshoot and lower settling times than a \gls{pid} and \gls{lqr} controller.
+
+In order to develop the \gls{gnc} schemes the system dynamics will be derived based on existing work~\cite{OR}, which outlines the aerodynamics of model rockets, and using actuators based on the existing work by~\cite{BPS} in~\fullref{sec:Dynamics}.
+In~\fullref{sec:Models}, all the different models of the system dynamics that are used in this paper will be presented.
+Subsequently in~\fullref{sec:Guidance}, different algorithms that generate trajectories for \gls{vtvl} will be presented and evaluated.
+Following this, in~\fullref{sec:Navigation}, a series of state estimators will be derived and their performance compared.
+In~\fullref{sec:Control}, different controllers will be designed and tuned, where they will be implemented and simulated so that they can be judged and compared.
+
+MATLAB/SIMULINK will be used to simulate the model rocket and the different \gls{gnc} schemes due to ease of use and existing capabilities, such as in built wind models. Mathematica and Maple were used for their symbolic maths capabilities to obtain symbolic \gls{lqr} and for trajectory optimisation.

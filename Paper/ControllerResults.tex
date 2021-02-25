@@ -1,0 +1,102 @@
+\subsection{Results}
+100 simulations were run each with random conditions for each controller for the time the motor was burning, 3.45s, and the mean, variance and maximum of the controlled variable was recorded.
+State estimators were not used in order to not affect the results due to the performance of the state estimator.
+
+\subsubsection{Attitude Control}
+The following results depict the mean, variance and maximum of the axis angle parameterisation, explained in \fullref{sec:definitions} of the rocket's orientation as the desired orientation was upright, the identity orientation.
+
+\begin{center}
+    \begin{tabulary}{\textwidth}{CCCCCCCC} 
+        \hline
+        & \w{No Control} & \w{Continuous \gls{lqr}} & \w{Continuous gain \\ scheduled \gls{lqr}} & \w{Discrete \gls{lqr}} & \w{Discrete gain \\ scheduled \gls{lqr}} & \w{Discrete time \\ delay approximating \\ \gls{lqr}} & \w{Discrete time \\ delay approximating \\ gain scheduled \\ \gls{lqr}} \\
+        \hline
+        \multirow{4}{*}{mean} 
+        & 0.1689 & 0.1922 & 0.1923 & 0.1919 & 0.1920 & 0.1898 & 0.1899 \\
+        & 0.9254 & 0.9197 & 0.9196 & 0.9195 & 0.9195 & 0.9201 & 0.9201 \\
+        & 0.1072 & 0.0820 & 0.0820 & 0.0886 & 0.0886 & 0.0820 & 0.0821 \\
+        & 14.0318 & 0.3595 & 0.3595 & 0.4057 & 0.4057 & 0.3843 & 0.3843\\
+        \hline
+        \multirow{4}{*}{variance} 
+        & 0.0020 & 0.0066 & 0.0066 & 0.0066 & 0.0066 & 0.0060 & 0.0061 \\
+        & 0.0525 & 0.0522 & 0.0522 & 0.0522 & 0.0522 & 0.0525 & 0.0525 \\
+        & 0.0492 & 0.0518 & 0.0518 & 0.0511 & 0.0511 & 0.0521 & 0.0521 \\
+        & 367.5029 & 0.0646 & 0.0646 & 0.0830 & 0.0830 & 0.0769 & 0.0769 \\
+        \hline
+        \multirow{4}{*}{maximum} 
+        & 0.2217 & 0.4378 & 0.4380 & 0.4390 & 0.4393 & 0.4241 & 0.4244 \\
+        & 0.9864 & 0.9935 & 0.9935 & 0.9930 & 0.9930 & 0.9924 & 0.9924 \\
+        & 1.0000 & 1.0000 & 1.0000 & 1.0000 & 1.0000 & 1.0000 & 1.0000 \\
+        & 76.1426 & 0.6687 & 0.6688 & 0.7562 & 0.7562 & 0.7263 & 0.7264 \\
+        \hline
+    \end{tabulary}
+    
+    \begin{tabulary}{\textwidth}{CCCCCCCCCC} 
+        \hline
+        & \w{Continuous time \\ delay approximating \\ \gls{lqr}} & \w{Continuous time \\ delay approximating \\ gain scheduled \\ \gls{lqr}} & \w{Continuous time \\ delay approximating \\ \gls{pid}} & \w{Discrete time \\ delay approximating \\ \gls{pid}} & \w{Discrete \gls{mpc}} & \w{Discrete time \\ delay approximating \\ \gls{mpc}} \\
+        \hline
+        & 0.1898 & 0.1898 & 0.1781 & 0.1233 & 0.1837 & 0.1843 \\
+        & 0.9204 & 0.9204 & 0.8700 & 0.6269 & 0.9277 & 0.9266 \\
+        & 0.0697 & 0.0697 & 0.3086 & 0.6265 & 0.0762 & 0.0645 \\
+        & 0.3475 & 0.3475 & 0.4808 & 0.9413 & 0.3963 & 0.6563 \\
+        \hline
+        & 0.0060 & 0.0060 & 0.0039 & 0.0044 & 0.0045 & 0.0047 \\
+        & 0.0525 & 0.0525 & 0.0513 & 0.0912 & 0.0523 & 0.0523 \\
+        & 0.0534 & 0.0534 & 0.0609 & 0.1049 & 0.0523 & 0.0536 \\
+        & 0.0627 & 0.0627 & 0.1356 & 0.4676 & 0.0942 & 0.2548 \\
+        \hline
+        & 0.4219 & 0.4221 & 0.3280 & 0.2158 & 0.3611 & 0.3827 \\
+        & 0.9927 & 0.9927 & 0.9848 & 0.9841 & 0.9937 & 0.9919 \\
+        & 1.0000 & 1.0000 & 1.0000 & 1.0000 & 1.0000 & 1.0000 \\
+        & 0.6599 & 0.6599 & 1.1246 & 2.6143 & 0.8829 & 1.3588 \\
+        \hline
+    \end{tabulary}
+\end{center}
+
+All the controllers have the same maximum value on the z axis due to the initial axis angle being $[0 \ 0 \ 1 \ 0]\tran$.
+The non-linear \gls{mpc} was unable to control the system, perhaps due to an implementation error, and due to its high computational burden it is unlikely to be fast enough to run in real time even on professional hardware. 
+This is illustrated by the work in convexifying non-convex problems to speed up solutions and guarantee finding a solution in a known number of operations, whilst we were trying to solve a non-convex problem using the non-linear \gls{mpc}.
+Therefore, results from the non-linear \gls{mpc} were not collected.
+
+The controllers all perform better in terms of the error angle in all metrics compared to the baseline, the lack of a controller. 
+\gls{mpc} does not perform better than \gls{lqr}, which may be due to only a constant constraint on the controller's output being placed which is unlikely to be exceeded.
+The continuous controllers consistently perform better than discrete controllers, this may be due to the roll actuators not being discrete or the time delays not being a multiple of the sample time.
+\Gls{pid} controllers perform the worst out of all the types, this may be due to poor tuning or due to the \gls{pid} controllers using the derivative of the error term instead of angular velocity like the rest of the controllers.
+Controllers which use a more accurate model of the system taking into account the time delay in the actuator tended to perform better better than controllers that do not however the \gls{mpc} controllers performed worse when accounting for the time delay than not.
+However, this may have been due to poor tuning which if true highlights that tuning \gls{mpc} controllers is difficult.
+Gain scheduling provides no significant benefit which may be due to likely due to deviations from the operating points being minor, so the difference between the non-linear controllers and linear controllers are minimal.
+
+Overall, non-linear controllers performed no better than linear controllers. 
+
+\subsubsection{Horizontal Velocity Control}
+The following results depict the mean, variance and maximum of the error in the x and y velocities ($[\m v^n_{x,y}]^n$) from the desired velocities, $[0 \ 0]\tran$.
+
+\begin{tabulary}{\textwidth}{CCCCCCCC} 
+    \hline
+    & \w{No Control} & \w{Continuous \gls{lqr}} & \w{Discrete \gls{lqr}} & \w{Discrete gain \\ scheduled \gls{lqr}} & \w{Discrete time \\ delay approximating \\ gain scheduled \\ \gls{lqr}} & \w{Continuous time \\ delay approximating \\ \gls{lqr}} & \w{Continuous time \\ delay approximating \\ gain scheduled \\ \gls{lqr}} \\ \hline
+    \multirow{2}{*}{mean} 
+    & 1.8519 & 0.0255 & 0.0268 & 0.0219 & 0.0218 & 0.0271 & 0.0268 \\
+    & 0.3205 & 0.0066 & 0.0069 & 0.0057 & 0.0057  & 0.0070 & 0.0069 \\
+    \hline
+    \multirow{2}{*}{variance} 
+    & 7.0541 & $10^{-3} \times$ 0.2022 & $10^{-3} \times$ 0.2252 & $10^{-3} \times$ 0.1443 & $10^{-3} \times$ 0.1466 & $10^{-3} \times$ 0.2315 & $10^{-3} \times$ 0.2223 \\
+    & 0.2229 & $10^{-3} \times$ 0.0359 & $10^{-3} \times$ 0.0399 & $10^{-3} \times$ 0.0276 & $10^{-3} \times$ 0.0287 & $10^{-3} \times$ 0.0412 & $10^{-3} \times$ 0.0400 \\ \hline
+    \multirow{2}{*}{maximum} 
+    & 9.8716 & 0.0440 & 0.0463 & 0.0366 & 0.0414 & 0.0459 & 0.0461 \\
+    & 1.8027 & 0.0247 & 0.0256 & 0.0220 & 0.0227 & 0.0263 & 0.0262 \\
+    \hline
+\end{tabulary}
+
+The controllers all perform better in terms in all metrics compared to the baseline, the lack of a controller. 
+Gain scheduling provides no significant benefit over time delay approximating controllers and led to instability for controllers not accounting for the actuator's time delay.
+The non time delay approximating continuous controller performs better than the discrete one however the discrete time delay approximating controllers perform better than the continuous one.
+Therefore, in general a continuous controllers has no benefit over a discrete controller and vice versa.
+
+Overall, for horizontal velocity control non-linear control performs worse than linear control, this may be due to poor tuning, errors in the simulation or an incorrect implementation of gain scheduling.
+
+Tests were performed from an upside down position however results were not collected as changing the $\m Q$ or $\m R$ matrices led to larger than expected variability and making controllers less aggressive improved performance. 
+This may have been due to incorrect aerodynamic modelling, an extremely unstable rocket that could not be controlled with the limited actuators or or an incorrect implementation of gain scheduling.
+In preliminary results it was difficult to see a significant difference between controllers that couldn't be easily fixed by adjusting the tuning. 
+As tuning the controllers for this scenario was difficult and would have taken too long, results were therefore omitted.
+
+Additionally, when the upside down position was rolled $90\degree$ no controller could stabilise the rocket. 
+The cause for this is unknown however, it may have been due to an error in the controllers which may have been subsequently fixed.

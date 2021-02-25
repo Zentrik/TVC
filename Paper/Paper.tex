@@ -1,0 +1,266 @@
+\documentclass{article}
+\usepackage[a4paper]{geometry}
+\usepackage[tuenc]{fontspec}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage[pdfencoding=auto,psdextra,colorlinks=true]{hyperref}
+\usepackage{longtable}
+\usepackage{gensymb}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{tikz}
+\usepackage{pgfplots} 
+\usepackage{pgfgantt}
+\usepackage{pdflscape}
+\usepackage{grffile}
+\usepackage{tikzscale}
+\usepackage[abbreviations, automake]{glossaries-extra}
+\usepackage{enumitem}
+\usepackage[backend=biber]{biblatex}
+\usepackage{subcaption}
+\usepackage{physics}
+\usepackage{caption}
+\usepackage{bm}
+\usepackage{tensor}
+\usepackage{tabulary}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{ifluatex} %https://tex.stackexchange.com/questions/158571/includesvg-does-not-detect-svg-file/158612#158612
+\ifluatex
+  \usepackage{pdftexcmds}
+  \makeatletter
+  \let\pdfstrcmp\pdf@strcmp
+  \let\pdffilemoddate\pdf@filemoddate
+  \makeatother
+\fi
+\usepackage{svg}
+\usepackage{cleveref}
+%\usepackage{lua-visual-debug} %visualise latex bounding boxes
+
+\allowdisplaybreaks %allow equations to span multiple pages
+
+%\usepackage{lmodern}
+\setmainfont{CMU Serif} % font with bold small caps for list of acronyms
+
+\usetikzlibrary{external}
+\tikzexternalize
+\tikzset{external/system call={lualatex \tikzexternalcheckshellescape -halt-on-error -interaction=batchmode -jobname "\image" "\texsource"}}
+\usetikzlibrary{plotmarks}
+\usetikzlibrary{arrows.meta}
+\usepgfplotslibrary{patchplots}
+\pgfplotsset{compat=newest} 
+\pgfplotsset{plot coordinates/math parser=false}
+
+% to scale tikz images
+\newlength\fwidth
+\newlength\fheight
+\newlength\wwidth
+\newlength\wheight
+
+\addbibresource{citations.bib} %add citations
+
+\graphicspath{{./Images/}} %add images
+
+\setlength{\parindent}{0mm}
+\setlength{\parskip}{\baselineskip}
+
+\setcounter{MaxMatrixCols}{20} %allow matrices with 20 columns up from 13
+
+\newcommand*{\fullref}[1]{\hyperref[{#1}]{\autoref*{#1}, \nameref*{#1},}} %to reference things with full name
+\newcommand*{\fullrefnocomma}[1]{\hyperref[{#1}]{\autoref*{#1}, \nameref*{#1}}} %to reference things with full name
+\newcommand*{\modelref}[1]{\hyperref[{#1}]{\nameref*{#1}, \ref{#1},}} %to reference models with full name, Nth Model 3.n
+\newcommand*{\modelrefnocomma}[1]{\hyperref[{#1}]{\nameref*{#1}, \ref{#1}}} %to reference models with full name, Nth Model 3.n
+\newcommand{\w}[1]{\rotatebox{90}{\parbox{3.5cm}{#1}}}
+\DeclareMathOperator*{\argmin}{argmin}
+\newcommand{\dpar}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\pjac}[3]{\left.\dpar{#1}{#2}\right|_{#3}}
+\newcommand{\tran}{^\mathsf{T}} %^\top
+\newcommand{\inv}{^{\text{-}1}}
+\newcommand{\ie}{\emph{i.e.}\ }
+\newcommand{\eg}{\emph{e.g.}\ }
+\newcommand{\etc}{\emph{etc} }
+
+\newcommand{\SO}[1]{$SO(#1)$}
+
+\newcommand{\initEst}[1]{\breve{#1}}
+\newcommand{\ori}{\xi}
+
+\newcommand{\bd}{\m \delta \m}
+\newcommand{\hbx}{\hat{\m{x}}}
+\newcommand{\hby}{\hat{\m{y}}}
+\newcommand{\m}{\bm}
+\newcommand{\fm}{\bm}
+\newcommand{\q}{\m q}
+\newcommand{\qv}{\q_v}
+\newcommand{\aforce}{\mathbf{Actuator\ Force}^b(t)}
+\newcommand{\amom}{\mathbf{Actuator\ Moment}^b(t)}
+\newcommand{\cotto}{\mathrm{COT\ to\ COM}}
+
+%\renewcommand{\glossarysection}[2][]{}
+\newglossary[nlg]{notation}{not}{ntn}{Notation}
+\newglossary[olg]{operators}{op}{ops}{Operators}
+\newglossary[cflg]{coordinateFrames}{cf}{cfs}{Coordinate Systems}
+
+%to make glossary hyperlinks the same as text colour
+\makeatletter 
+\newcommand*{\glsplainhyperlink}[2]{%
+  \colorlet{currenttext}{.}% store current text color
+  \colorlet{currentlink}{\@linkcolor}% store current link color
+  \hypersetup{linkcolor=currenttext}% set link color
+  \hyperlink{#1}{#2}%
+  \hypersetup{linkcolor=currentlink}% reset to default
+}
+\let\@glslink\glsplainhyperlink
+\makeatother
+
+%\renewcommand{\glsnamefont}[1]{\textbf{\textsc{#1}}} %to make bold short caps in list of acronyms, for glossaries package
+\glssetcategoryattribute{general}{glossdesc}{firstuc}
+\glssetcategoryattribute{abbreviation}{glossdesc}{title}
+\setabbreviationstyle{long-short-sc}
+\makeglossaries
+
+\newabbreviation{mimo}{mimo}{multi-input, multi-output}
+\newabbreviation{siso}{siso}{single-input, single-output}
+\newabbreviation{lqr}{lqr}{linear quadratic regulator}
+\newabbreviation{lqg}{lqg}{linear quadratic Gaussian}
+\newabbreviation{vtvl}{vtvl}{vertical take off/ vertical landing}
+\newabbreviation{ekf}{ekf}{extended kalman filter}
+\newabbreviation{rlv}{rlv}{reusable launch vehicle}
+\newabbreviation{mrp}{mrp}{modified rodrigues parameter}
+\newabbreviation{tvc}{tvc}{thrust vector control}
+\newabbreviation{gnc}{gnc}{guidance, navigation and control}
+\newabbreviation{imu}{imu}{inertial measurement unit}
+\newabbreviation{ukf}{ukf}{unscented kalman filter}
+\newabbreviation{pid}{pid}{proportional-integral-derivative}
+\newabbreviation{mpc}{mpc}{model predictive control}
+\newabbreviation{cfd}{cfd}{computational fluid dynamics}
+\newabbreviation{lti}{lti}{linear time invariant}
+\newabbreviation{usque}{usque}{unscented quaternion estimator}
+\newabbreviation{riekf}{riekf}{right invariant extended kalamn filter}
+\newabbreviation{gnss}{gnss}{global navigation satellite system}
+\newabbreviation{stem}{stem}{science, technology, engineering, and mathematics}
+
+\newglossaryentry{attitude}{
+  name={Attitude},
+  text={attitude},
+  description={The orientation of the rocket with respect to a reference}
+}
+
+\usepackage{notation}
+
+\title{How Best to Achieve Vertical Take Off/ Vertical Landing using Model Rockets}
+\author{}
+
+\begin{document}
+
+\maketitle
+
+\begingroup
+\hypersetup{linkcolor=black}
+\tableofcontents
+\endgroup
+
+\newpage
+
+\printunsrtglossary[type=notation]
+\printunsrtglossary[type=operators]
+
+\newpage
+\begin{abstract}
+  The goal of this paper is to provide a critical review of different \gls{gnc} schemes that can achieve \gls{vtvl}, which is where a rocket takes off and lands propulsively, using a model rocket.
+  \Glspl{rlv}, many of which use \gls{vtvl}, could lower costs, decrease waste and allow for more scientific research extraterrestrially. 
+  Existing research typically only presents an  \gls{attitude} controller, which is insufficient for \gls{vtvl}, whilst our main contribution is presenting \gls{gnc} schemes for \gls{vtvl} and comparing them to determine the best.
+  The schemes are simulated with varying parameters to test robustness and to evaluate their performance, with linear control and non-linear navigation and guidance performing best.
+\end{abstract}
+%
+\input{Introduction.tex}
+%
+\input{Definitions.tex}
+\input{StateSpace.tex}
+%
+\input{Dynamics.tex}
+\input{Translation.tex}
+%
+The dynamics derived in the section have been deemed to be sufficiently accurate and so indicative of real world performance, because the dynamics are similar to those found in existing literature where they have been shown to be accurate to the real world. This will allow for a fair comparison between different \gls{gnc} schemes and will show if \gls{vtvl} has been achieved.
+%
+\input{Model.tex}
+%
+\input{Guidance.tex}
+%
+\input{Navigation.tex}
+%
+\section{Control} 
+\label{sec:Control}
+As outlined in the introduction, a controller is necessary in order to maintain the rocket on a specified trajectory which is necessary to achieve \gls{vtvl} for the same reasons why guidance is important outlined in~\fullrefnocomma{sec:Guidance}.
+
+The system that will be analysed is a \gls{mimo} system, this means that there are multiple inputs to the system (the forces and moments imparted on it) and there are multiple outputs (such as the \gls{attitude} and position).
+\gls{mimo} systems are typically controlled using state space methods however, classical methods can be used if the system is represented using a transfer function matrix.
+
+The output of the controller will be a vector of moments because this means \gls{attitude} controllers can account for changing thrust easily.
+Additionally, \gls{attitude} control is very important for horizontal velocity controllers as \gls{attitude} control is the predominant way to control velocity.
+\input{ErrorTerms.tex}
+\input{PID.tex}
+\input{LQR.tex}
+\input{MPC.tex}
+\input{ControllerResults.tex}
+%
+\section{Conclusion}
+In this paper, different \gls{gnc} schemes that could achieve \gls{vtvl} were compared.
+The results collected from the proposed controllers in this paper demonstrate the validity of controlling the \gls{attitude} or velocity. 
+The \gls{riekf} is shown in \cite{Zam2015,Kok2017,Mad2011} to perform sufficiently well and the control should work well when using the estimated state however, future work is needed to confirm this.
+Whilst results were not collected for the guidance scheme, preliminary tests indicate that \gls{vtvl} can be achieved using the proposed guidance laws, with the algorithm proposed in \fullref{subsec:TrajectoryOptimisation} minimising impact velocity.
+So \gls{vtvl} should be achieved if a suitable \gls{gnc} scheme from this paper is implemented.
+
+Time delay approximating \gls{lqr} controllers perform best in terms of mean, variance and maximum error.
+Additionally, \gls{mpc} controllers can perform the same as infinite horizon \gls{lqr} controllers so \gls{mpc} would also perform as well as time delay approximating \gls{lqr} controllers however, it would be computationally more expensive and more complicated to implement so \gls{lqr} is overall the best.
+Controllers which accounted for the time delay present in the actuators consistently performed better than those that did not in terms of mean, variance and maximum error.
+The non-linear controllers proposed on the whole provide little benefit or worsen performance compared to their linear counterpart.
+This may be due to poor tuning, more advanced non-linear controllers being needed or the deviation from the operating points being minimal and so further testing would be required with greater deviations from the operating points.
+
+Results were not collected for the navigation schemes as extensive results have already been collected as can be seen in \cite{Zam2015,Kok2017,Mad2011}.
+These results has led me to conclude that the \gls{riekf} would perform the best out of all the state estimator and observers discussed in this paper.
+Whilst a Luenberger observer is used for the additional states added by using a padé approximation as the dynamics are linear and as there should be little to no noise in the states as they have been approximated using a state estimator.
+Additionally, a Kalman filter can be implemented as a Luenberger observer if the limit of its gain is taken as $k \to \infty$.
+
+The guidance schemes proposed for landing are all non-convex and non-linear however, the problems could be convexified to improve the speed at which solution is found.
+Linear schemes could not be used for landing as the dynamics of the system cannot be accurately modelled using linear dynamics for the whole flight.
+However, linear schemes are sufficient for take-off where perhaps horizontal velocity is being controlled.
+
+Achieving \gls{vtvl} in model rockets allows for the \gls{gnc} schemes to be cheaply and easily tested, so they can then be implemented of professional rockets.
+As discussed before this will greatly benefit society as whole.
+The \gls{gnc} schemes presented could also be used to develop small rockets that launch small satellites into orbit as discussed in \cite{Kehl2015}, which will greatly increase research by scientists and engineers across a wide range of fields.
+The navigation and control can be implemented on board however, the guidance scheme would need to be improved to increase the speed at which a solution is found. 
+Furthermore, \gls{vtvl} can inspire children and teenagers into \gls{stem}.
+
+\section{Future Work}
+There is a lot of future work that could be done to improve upon this paper. 
+For example, results could be obtained for the computational complexity, robustness, settling time, overshoot and stability of the controllers and results could be graphed in order to better compare different controllers and determine their performance.
+Additionally, $H_\infty$, finite horizon \gls{lqr}, feedforward and other controllers could also be evaluated.
+Empirical results could also be obtained for a more accurate comparison between controllers.
+The optimal time to ignite motors when using trajectory optimisation algorithm could also be solved for.
+Additionally, optimisation problems could be sped up, so guidance can run in real time.
+Also, a \gls{gnss} sensor could be added to the \gls{ekf} and \gls{riekf} as preliminary tests show low accuracy in horizontal position and velocity estimates with current sensors.
+The discrete time quaternion update could be used in discrete control models to improve the accuracy of the models and therefore controller performance.
+More accurate aerodynamics could be obtained, e.g. from wind tunnel testing. A more accurate model of the dynamics could improve performance, e.g. by incorporating aerodynamics into models being used by \gls{gnc}.
+Other state estimators such as \gls{usque} could be explored to improve performance.
+Instead of switching to the shorter rotation automatically, the rotation could only be switched if it would decrease the time to reaching the desired orientation.
+A more accurate model of the actuator could be obtained so the results are more indicative of real world performance.
+The angular velocity deviation could be added to the \gls{riekf} instead of using the angular velocity.
+Finally, roll control could be separated from pitch and yaw control to allow it to run at a higher frequency and so improve performance.
+\newpage
+\appendix
+\section{Appendix}
+\input{Coefficients.tex}
+
+\newpage
+%\renewcommand{\glsnamefont}[1]{\makefirstuc{#1}}
+\printunsrtglossary[type=main]
+%printunsrtglossary[type=abbreviation]
+\printglossaries
+\printunsrtglossary[type=coordinateFrames]
+
+\newpage
+\printbibliography[heading=bibintoc, title={Bibliography}]
+
+\end{document}

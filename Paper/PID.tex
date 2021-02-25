@@ -1,0 +1,25 @@
+\subsection{Proportional-Integral-Derivative Controller}
+\gls{pid} control is a form of closed loop control that aims to minimise the error $e(t)$ in the long run, typically the difference between the desired value $r(t)$ and the measured value $y(t)$, by manipulating the control variable $u(t)$.
+A \gls{pid} controller uses the derivative, integral of the error and the error itself to generate a control variable $u(t)$ through the equation:
+\begin{align}
+    u(t) = K_p e(t) + K_i \int_0^t e(t)dt + K_d \frac{\mathrm{d}}{\mathrm{d} t}  e(t)
+\end{align}
+where $K_p$, $K_i$, $K_d$ are values that are obtained from tuning and may be constant or a function, e.g. of time.
+The $K_p$, $K_i$, $K_d$ terms have various effects on the controller's performance as summarised in table 1.
+Some effects not included in the table are that if the controller saturates the $K_i$ term can worsen performance as the integral increases leading to overshoot. 
+Techniques such as anti-windup can be employed to deal with this problem.
+The $K_d$ term can worsen performance if there is significant measurement noise in the error term, especially high frequency noise.
+However, a filtered derivative can be used where a low pass filter is used to ignore high frequency noise.
+The $K_d$ term can also worsen stability if a transport delay exists~\cite{Li2006}.
+The $K_i$ or $K_d$ terms may sometimes be set to 0 to improve performance or due to difficult in tuning, especially with $K_d$.
+
+Cascade control, when the output on the first \gls{pid} controller sets the setpoint for the second controller, allows for \gls{pid} controllers to control \gls{mimo} systems and can improve the response to disturbances.
+Typically the first \gls{pid} controller controls a slow parameter whilst the second controller deals with a more rapidly changing parameter~\cite{bolton2015}.
+
+\Gls{pid} control has limitations if the system is highly non-linear, open loop unstable, has lots of delay or is non minimum phase, more advanced controllers may be necessary~\cite{Dou2018}.
+%
+\begin{figure}[h]
+    \centering
+    \includesvg[width = \textwidth]{PID}
+    \caption*{\cite{Li2006}}
+\end{figure}
