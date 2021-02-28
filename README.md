@@ -1,7 +1,7 @@
 Rocket/roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from Rocket/StateSpaceController.m.
 
-The gain scheduled controllers may be incorrect as I linearised about points which are not in equilbrium, which I don't think you are supposed to do.
-If I get the time, I will add a TVLQR, try to implement partial feedback linearisation and fix the guidance MPC.
+The position control gain scheduled controllers are incorrect as I linearised about points which are not in equilbrium but did not account for the affine terms.
+If I get the time, I will add an iLQR, try to implement partial feedback linearisation and fix the guidance MPC.
 
 <a href="https://www.paypal.com/paypalme/zentriktvc/5/"><img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/master/blue.svg" height="40"></a>  
 If you found my work useful, conside donating. Thanks.
@@ -22,7 +22,7 @@ Other videos by brian, brunton, 3b1b etc.
 
 # Recommended Reading
 
-[My paper](Paper/Paper.pdf). The gain scheduling section is likely wrong as I didn't linearise about equilibrium points and didn't add an affine term to the state space model to account for this. Also, the appendix is not complete. However, hopefully it is helpful and the references are also recommended to be read.
+[My paper](Paper/Paper.pdf). The postion control gain scheduling section is wrong as I didn't linearise about equilibrium points and didn't add an affine term to the state space model to account for this. Also, the appendix is not complete. However, hopefully it is helpful and the references are also recommended to be read.
 
 [The Fundamentals of Control Theory](https://www.patreon.com/posts/book-is-now-free-28313078)
 
