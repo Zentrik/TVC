@@ -1,10 +1,9 @@
-Rocket/roll_control.slxc should be the simulator and a controller and state estimator can be generated using an example from Rocket/StateSpaceController.m.
+[Roll control](Rocket/roll_control.slx) is the full simulator and a state estimator can be generaed using an example from [StateSpaceController](Rocket/StateSpaceController.m). A controller can be generate by modifying [affine LQR](Rocket/affine_controller.m) with an example from [State Space Controller](Rocket/StateSpaceController.m).
 
-The gain scheduled controllers are incorrect as I linearised about points which are not in equilbrium but did not account for the affine terms.
-If I get the time, I will add an iLQR, try to implement partial feedback linearisation and fix the guidance MPC.
+If I get the time, I will try to implement partial feedback linearisation and fix the guidance MPC.
 
 <a href="https://www.paypal.com/paypalme/zentriktvc/5/"><img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/master/blue.svg" height="40"></a>  
-If you found my work useful, conside donating. Thanks.
+If you found my work useful, consider donating. Thanks.
 
 # Recommended Watching
 
