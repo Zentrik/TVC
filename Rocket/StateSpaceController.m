@@ -422,7 +422,7 @@ function [nocontrol, polecontrol, control, LQRcontrol, LQIcontrol, noroll, norol
     Rd = diag([0.3 0.3 0.6]);
 
     no_delay = ss(Ari, Bri, Cri, Dri);
-    roll_control_delay = ss(Ari, Bri, Cri, Dri, 'InputDelay',[0.07 0.07 0.0]);
+    roll_control_delay = ss(Ari, Bri, Cri, Dri, 'InputDelay',[0.07 0.07 0.01]);
     roll_control_delay_approx = minreal(pade(roll_control_delay, 7)); 
     %[a,b,c,d,e] = ctrbf(roll_control_delay_approx.A, roll_control_delay_approx.B, roll_control_delay_approx.C); [sum(e), length(roll_control_delay_approx.A)]
     %[X,K,clp,INFO] = icare(no_delay.A,no_delay.B,Qv,R)
