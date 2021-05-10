@@ -1,5 +1,5 @@
-function [K_x, k_0, S] = affine_controller(state)
-  persistent Ari Bri q w Inertia
+function [K_x, k_0, S] = affine_controller(state, current_u)
+  persistent Ari Bri q w Inertia Mb
   
   if isempty(Ari)
     q = sym('q', [4 1], 'real');
@@ -18,8 +18,6 @@ function [K_x, k_0, S] = affine_controller(state)
     Inertia = diag([0.0829427911790996, 0.0829427911790996, 0.000246795169917015]);
 
     Ari = subs(Ari, I, Inertia);
-    Ari = subs(Ari, Mb, [0;0;0]);
-
     Bri = subs(Bri, I, Inertia);
   end
 
@@ -28,14 +26,15 @@ function [K_x, k_0, S] = affine_controller(state)
   A = subs(Ari, q, quat);
   A = subs(A, w, ang);
   B = subs(Bri, q, quat);
+  Ari = subs(Ari, Mb, current_u);
 
   A = double(A);
   B = double(B);
 
   qdot = .5 * quatmultiply(quat', [0, ang'])';
-  c = [Inertia \ ([0;0;0] - cross(ang,Inertia*ang)); qdot(2:4); quat(2:4)];
+  c = [Inertia \ (current_u - cross(ang, Inertia*ang)); qdot(2:4); quat(2:4)];
   
   Q = diag([1,1,1, 2,2,2, 1,1,1]);
-  R = diag([0.3 0.3 200]);
-  [K_x, k_0, ~, S] = Affine_LQR(A, B, Q, R, zeros(9, 1), zeros(3, 1), state, zeros(3, 1), inf, c);
+  R = diag([0.3 0.3 50]);
+  [K_x, k_0, ~, S] = Affine_LQR(A, B, Q, R, zeros(9, 1), zeros(3, 1), state, current_u, inf, c);
 end

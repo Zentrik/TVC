@@ -2,6 +2,7 @@
 /Rocket/slprj
 /Rocket/Forces_grt_rtw
 Rocket/codegen/
+/Rocket/StateEstimatorForActuatorDelay_grt_rtw
 
 Paper/*
 !Paper/*.tex
