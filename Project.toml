@@ -1,0 +1,9 @@
+name = "scp_new_problem"
+uuid = "f6740e87-ebf1-4d72-a873-96c32bb67be4"
+authors = ["Danylo Malyuta <danylo@malyuta.name>"]
+version = "0.1.0"
+
+[deps]
+Parser = "8531126a-8d07-4702-a998-a66a2313e289"
+Solvers = "7328b228-a5db-11eb-3781-05e2836e9a59"
+Utils = "8b916518-a5eb-11eb-206d-83b0b19bff08"
