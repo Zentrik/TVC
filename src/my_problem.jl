@@ -8,7 +8,7 @@ using PyPlot
 using Colors
 using Printf
 
-export solve
+export solve, plot
 
 _ro = 0.35
 _co = [-0.1; 1]
@@ -23,7 +23,6 @@ function solve()
     _xf = [0; 2; 0] # Terminal state
     problem_set_guess!(
         pbm, (N, pbm) -> begin
-            pars = pbm.mdl
             x = straightline_interpolate(_x0, _xf, N)
             idle = zeros(pbm.nu)
             u = straightline_interpolate(idle, idle, N)
