@@ -121,7 +121,7 @@ function solve()
     disc_method = FOH
     wvc, wtr = 1e3, 1e-1 # wtr is important, needs to be small but too small and we get problems
     feas_tol = 5e-3
-    ε_abs, ε_rel = 1e-8, 1e-5
+    ε_abs, ε_rel = 1e-5, 1e-3
     q_tr = Inf
     q_exit = Inf
     solver, options = ECOS, Dict("verbose"=>0)
