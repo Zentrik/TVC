@@ -3,10 +3,13 @@ include("./3dof_testing.jl")
 end # module
 
 using .scp_new_problem
-using Utils, LinearAlgebra, Plots
 
 solution = scp_new_problem.solve(); # Remember J is augmented cost function
 # print(sample(solution.xc, 1)[4:6]' * sample(solution.xc, 1)[4:6])
+
+include("./Rocket_Acceleration.jl")
+using Utils, LinearAlgebra, Plots
+
 
 ctres = 1000
 N = size(solution.xd, 2)
@@ -17,12 +20,25 @@ plotlyjs()
 
 t_coast = 3.45 # solution.p[2]
 
-Plots.plot(LinRange(0, 1, ctres) .* t_coast, xct[1:3, :]', title = "Position")
+# Plots.plot(LinRange(0, 1, ctres) .* t_coast, xct[1:3, :]', title = "Position")
 
-Plots.plot(LinRange(0, 1, ctres) .* t_coast, xct[4:6, :]', title = "Velocity")
+# Plots.plot(LinRange(0, 1, ctres) .* t_coast, xct[4:6, :]', title = "Velocity")
 
-Plots.plot(LinRange(0, 1, ctres) .* t_coast, vct')
-Plots.plot(LinRange(0, 1, ctres) .* t_coast, norm.(eachcol(vct)), title = "Thrust Magnitude") # norm constraint is broken intersample ...
+# Plots.plot(LinRange(0, 1, ctres) .* t_coast, vct')
+# plot(LinRange(0, 1, ctres) .* t_coast, Acceleration(LinRange(0, 1, ctres) .* t_coast))
+# Plots.plot(LinRange(0, 1, ctres) .* t_coast, norm.(eachcol(vct)), title = "Thrust Magnitude") # norm constraint is broken intersample ...
+# plot(solution.td .* t_coast, norm.(eachcol(solution.ud)) ./ 10.0, title = "Throttle Level")
+
+T = LinRange(0, 1, ctres) .* t_coast
+Magnitude = norm.(eachcol(vct));
+Max = Acceleration(T)
+
+# Continouous 
+plot(T, ThrottleLevel(Magnitude, Max), title = "Throttle Level")
+
+# Discrete
+plot(solution.td .* t_coast, ThrottleLevel(norm.(eachcol(solution.ud)), Acceleration(solution.td .* t_coast)), title = "Throttle Level")
+
 
 println(solution.p[1])
 

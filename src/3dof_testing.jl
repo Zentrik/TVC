@@ -8,11 +8,9 @@ using Plots
 using Colors
 using Printf
 
-export solve, plot
+include("./Rocket_Acceleration.jl")
 
-_ro = 0.35
-_co = [-0.1; 1]
-_carl, _carw = 0.2, 0.1
+export solve
 
 function solve()
     # Define the problem
@@ -70,7 +68,7 @@ function solve()
             [zeros(3, 3); I(3)] * _tf ,
         # df/dp
         (t, k, x, u, p, pbm) ->
-            zeros(pbm.nx, 1))
+            zeros(pbm.nx, 1) )
     # Boundary conditions
     problem_set_bc!(
         pbm, :ic, # Initial condition
@@ -96,8 +94,6 @@ function solve()
     # )
 
     # Convex State Constraints
-
-    # Convex Input Constraints
     problem_set_X!(
         pbm, (t, k, x, p, pbm, ocp) -> begin
 
@@ -107,24 +103,25 @@ function solve()
             - height
             end)
         end)
-
+    
+    # Convex Input Constraints
     problem_set_U!(
         pbm, (t, k, u, p, pbm, ocp) -> begin
 
         @add_constraint(
-            ocp, SOC, "Thrust Magnitude <= 10", (u,), begin
+            ocp, SOC, "Thrust Magnitude <= Max", (u,), begin # u is the descision variable for the constraint, but t isn't so don't include?
                 local u = arg[1]
-                [10; u]
+                [Acceleration(t * 3.45); u]
             end)
         end)
 
     # Define the SCP algorithm parameters
-    N, Nsub = 11, 10
+    N, Nsub = floor(Int, 3.45 / 0.1) + 1, 10 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u
     iter_max = 30
     disc_method = FOH
-    wvc, wtr = 1e3, 1e0
+    wvc, wtr = 1e3, 1e-1 # wtr is important, needs to be small but too small and we get problems
     feas_tol = 5e-3
-    ε_abs, ε_rel = 1e-5, 1e-3
+    ε_abs, ε_rel = 1e-8, 1e-5
     q_tr = Inf
     q_exit = Inf
     solver, options = ECOS, Dict("verbose"=>0)

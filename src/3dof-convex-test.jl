@@ -1,7 +1,10 @@
 using JuMP, ECOS
+include("./Rocket_Acceleration.jl")
 
-N = 11
 t_coast = 3.45
+dt = 0.1 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u
+
+N = floor(Int, t_coast / dt) + 1 
 dt = t_coast / (N - 1)
 
 g = [0; 0; -9.80655]
@@ -31,9 +34,10 @@ t = @variable(model)
 @constraint(model, r[3, :] .>= 0)
 
 @constraint(model, [k in 1:N-1], v[:, k + 1] .== v[:, k] + (g + u[:, k] + g + u[:, k + 1]) / 2 * dt )
+# v[:, k] + dt * g + dt / 2 * (u[:, k]
 @constraint(model, [k in 1:N-1], r[:, k + 1] .== r[:, k] + dt / 2 * (v[:, k] + v[:, k + 1]) + dt^2 / 12 * (u[:, k + 1] - u[:, k]) )
-
-@constraint(model, [k in 1:N], [10; u[:, k]] in SecondOrderCone()) # @constraint(model, [k in 1:N], norm(u[:, k]) <= 10)
+# r[:, k] + dt  * v[:, k] + dt^2 / 2 * g + dt^2 / 3 * u[:, k] + dt^2 / 6 * u[:, k+1] 
+@constraint(model, [k in 1:N], [Acceleration(dt * (k -1)); u[:, k]] in SecondOrderCone()) # @constraint(model, [k in 1:N], norm(u[:, k]) <= 10)
 
 #print(model)
 optimize!(model)
@@ -45,6 +49,7 @@ v  = JuMP.value.(v)
 t = 0:dt:t_coast;
 plot(t, norm.(eachcol(v)))
 plot(t, norm.(eachcol(u)))
+plot(t, ThrottleLevel(norm.(eachcol(u)), Acceleration(t) ) )
 
 # r = zeros(3, N)
 # v = zeros(3, N) 
