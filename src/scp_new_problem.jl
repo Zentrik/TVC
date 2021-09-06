@@ -1,5 +1,5 @@
 module scp_new_problem
-include("./3dof_testing.jl")
+include("./3dof.jl")
 end # module
 
 using .scp_new_problem
