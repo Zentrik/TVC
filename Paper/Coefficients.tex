@@ -12,7 +12,7 @@ Reference Area is $ \pi r^2 $
 
 \begin{align}
     mul &= 3 \left( \frac{0.275 * \bar{d}}{A_{ref} * d_{ref}} * 0.95^4 \right) \\
-    C_{m\ damping} &= min \left( \sum_{i \in Components} \frac{C_N * CP_x}{l}, mul * \frac{\omega_y^2}{\norm{\m v_\inf}^2} \right) * \operatorname{sign}(\omega_y)\\
+    C_{m\ damping} &= min \left( \sum_{i \in Components} \frac{C_N * CP_x}{l}, mul * \frac{\omega_y^2}{\norm{\m v_\infty}^2} \right) * \operatorname{sign}(\omega_y) \\
     C_m &= \left( \sum_{i \in Components} \frac{C_N * CP_x}{d_{ref}} \right) - \frac{C_N * CM_x}{d_{ref}} - C_{m\ damping}
 \end{align}  
 
@@ -28,11 +28,11 @@ Reference Area is $ \pi r^2 $
 \end{equation} 
 
 \begin{align}
-    C_{pressure} = 0.8 \frac{d_{ref}}{2 \sqrt{\frac{d_{ref}{2}^2 + l^{Nose\ Cone}^2}}
+    C_{pressure} = 0.8 \frac{d_{ref}}{2 \sqrt{\frac{d_{ref}}{2}^2 + l^{{Nose\ Cone}^2}}}
 \end{align}
 
 \begin{align}
-    Cfc1 = (\frac{3}{2} \ln{Reynolds} - 5.6)^{text{-}2} \\
+    Cfc1 = (\frac{3}{2} \ln{Reynolds} - 5.6)^{\text{-}2} \\
     1 - \frac{mach^2}{10} \\
     \max(Cfc1, 0.032 )
 \end{align}
