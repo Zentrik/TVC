@@ -1,4 +1,4 @@
-using JuMP, ECOS, MathOptInterface, Utils, Plots
+using JuMP, ECOS, MathOptInterface, Utils, Plots, LinearAlgebra
 include("./Rocket_Acceleration.jl")
 
 t_coast = 3.45
@@ -22,6 +22,7 @@ tmp = [0; 0; - 2 * (r_0[3] + v_0[3] * t_burn) / t_burn^2] # [0.0, 0.0, -5.040957
 
 x = zeros(6, N)
 u = zeros(3, N)
+p = t_coast
 
 for k = 1:N
     local t = (k - 1) / (N - 1) * t_burn
@@ -30,16 +31,22 @@ for k = 1:N
 end   
 
 #print(model)
-function build(x_prev, u_prev, dt, t_burn, wvc, wtr)
+function build(x_prev, u_prev, dt, p_prev, t_burn, wvc, wtr)
 
     model = Model(optimizer_with_attributes(ECOS.Optimizer, "verbose" => 0)); 
 
     @variable(model, r[1:3, 1:N])
     @variable(model, v[1:3, 1:N])
+
     @variable(model, u[1:3, 1:N])
+
+    @variable(model, p)
+
     @variable(model, virtual[1:6, 1:N])
+
     @variable(model, delta_x[1:6, 1:N])
     @variable(model, delta_u[1:3, 1:N])
+    @variable(model, delta_p)
 
     t = @variable(model)
     @constraint(model, [t; v[:, N] .- v_N] in SecondOrderCone()) # norm objective
@@ -51,16 +58,21 @@ function build(x_prev, u_prev, dt, t_burn, wvc, wtr)
     @variable(model, ηu[1:N])
     @constraint(model, [k in 1:N], [ηu[k]; delta_u[:, k]] in MathOptInterface.NormInfinityCone(4))
 
+    @variable(model, ηp)
+    @constraint(model, [ηp; delta_p] in MathOptInterface.NormInfinityCone(2))
+
     @variable(model, P[1:N])
     @constraint(model, [k in 1:N], [P[k]; virtual[:, k]] in MathOptInterface.NormOneCone(7))
 
     time = collect(0:dt:t_burn)
-    @objective(model, Min, t + wtr*(trapz(ηx, time)+trapz(ηu, time)) + wvc*(trapz(P, time)) )
+    @objective(model, Min, t + wtr*(trapz(ηx, time)+trapz(ηu, time)) + 0.1 * ηp + wvc*(trapz(P, time))  )
 
     # @objective(model, Min, trapz(dot.(eachcol(r), eachcol(r)), collect(0:dt:t_coast)) ) # norm not supported in this fashion? cba to work out how
 
-    @constraint(model, r[:, 1] .== r_0)
-    @constraint(model, v[:, 1] .== v_0)
+    @constraint(model, p >= 0)
+
+    @constraint(model, r[:, 1] .== r_0 + p_prev * v_0 + p_prev^2 /2 * g + (v_0 + g * p_prev) * (p - p_prev))
+    @constraint(model, v[:, 1] .== v_0 + p_prev * g + g * (p - p_prev))
 
     @constraint(model, r[3, N] == r_N[3])
 
@@ -69,16 +81,17 @@ function build(x_prev, u_prev, dt, t_burn, wvc, wtr)
     @constraint(model, [k in 1:N-1], v[:, k + 1] .== v[:, k] + (g + u[:, k] + g + u[:, k + 1]) / 2 * dt + virtual[4:6, k])
     @constraint(model, [k in 1:N-1], r[:, k + 1] .== r[:, k] + dt / 2 * (v[:, k] + v[:, k + 1]) + dt^2 / 12 * (u[:, k + 1] - u[:, k]) + virtual[1:3, k])
 
-    @constraint(model, [k in 1:N], [Acceleration(dt * (k -1)); u[:, k]] in SecondOrderCone()) # @constraint(model, [k in 1:N], norm(u[:, k]) <= 10)
+    @constraint(model, [k in 1:N], [Acceleration(dt * (k - 1)); u[:, k]] in SecondOrderCone()) # @constraint(model, [k in 1:N], norm(u[:, k]) <= 10)
 
     @constraint(model, delta_x .== [r; v] .- x_prev) 
     @constraint(model, delta_u .== u .- u_prev) 
+    @constraint(model, delta_p .== p - p_prev) 
 
     return model
 end
 
-for i = 1:4
-    local model = build(x, u, dt, t_burn, wvc, wtr)
+for i = 1:0
+    local model = build(x, u, dt, p, t_burn, wvc, wtr)
     optimize!(model)
     @show objective_value(model)
     @show norm(JuMP.value.(model.obj_dict[:P]), Inf)
@@ -86,18 +99,21 @@ for i = 1:4
 
     local r = JuMP.value.(model.obj_dict[:r])
     local v = JuMP.value.(model.obj_dict[:v])  
+    global x = [r; v]
+
     global u = JuMP.value.(model.obj_dict[:u])
 
-    global x = [r; v]
+    global p = JuMP.value.(model.obj_dict[:p])
 end
 
-model = build(x, u, dt, t_burn, wvc, wtr)
+model = build(x, u, dt, p, t_burn, wvc, wtr)
 optimize!(model)
 @show objective_value(model)
 
 r = JuMP.value.(model.obj_dict[:r])
 v = JuMP.value.(model.obj_dict[:v])  
 u = JuMP.value.(model.obj_dict[:u])
+p = JuMP.value.(model.obj_dict[:p])
 
 x = [r; v]
 
@@ -107,6 +123,8 @@ plotlyjs()
 
 plot(t, norm.(eachcol(u)))
 plot(t, ThrottleLevel(norm.(eachcol(u)), Acceleration(t) ) )
+
+print(p)
 
 # r = zeros(3, N)
 # v = zeros(3, N) 
