@@ -1,10 +1,12 @@
+using Revise
+
 module scp_new_problem
-include("./3dof.jl")
+include("./3dof fixed t_burn.jl")
 end # module
 
 using .scp_new_problem
 
-solution = scp_new_problem.solve(); # Remember J is augmented cost function
+solution = scp_new_problem.solve(:ptr); # Remember J is augmented cost function
 # print(sample(solution.xc, 1)[4:6]' * sample(solution.xc, 1)[4:6])
 
 include("./Rocket_Acceleration.jl")
@@ -18,32 +20,33 @@ vct = hcat([sample(solution.uc, t) for t in LinRange(0, 1, ctres)]...)
 
 plotlyjs()
 
-t_coast = 3.45 # solution.p[2]
+t_burn = 3.45 #solution.p[2]
 
-# Plots.plot(LinRange(0, 1, ctres) .* t_coast, xct[1:3, :]', title = "Position")
+# Plots.plot(LinRange(0, 1, ctres) .* t_burn, xct[1:3, :]', title = "Position")
 
-# Plots.plot(LinRange(0, 1, ctres) .* t_coast, xct[4:6, :]', title = "Velocity")
+# Plots.plot(LinRange(0, 1, ctres) .* t_burn, xct[4:6, :]', title = "Velocity")
 
-# Plots.plot(LinRange(0, 1, ctres) .* t_coast, vct')
-# plot(LinRange(0, 1, ctres) .* t_coast, Acceleration(LinRange(0, 1, ctres) .* t_coast))
-# Plots.plot(LinRange(0, 1, ctres) .* t_coast, norm.(eachcol(vct)), title = "Thrust Magnitude") # norm constraint is broken intersample ...
+# Plots.plot(LinRange(0, 1, ctres) .* t_burn, vct')
+plot(LinRange(0, 1, ctres) .* t_burn, Acceleration(LinRange(0, 1, ctres) .* t_burn))
+plot!(LinRange(0, 1, ctres) .* t_burn, norm.(eachcol(vct)), title = "Thrust Magnitude") # norm constraint is broken intersample ...
 # plot(solution.td .* t_coast, norm.(eachcol(solution.ud)) ./ 10.0, title = "Throttle Level")
 
-T = LinRange(0, 1, ctres) .* t_coast
-Magnitude = norm.(eachcol(vct));
-Max = Acceleration(T)
+# T = LinRange(0, 1, ctres) .* t_burn
+# Magnitude = norm.(eachcol(vct));
+# Max = Acceleration(T)
 
-# Continouous 
-plot(T, ThrottleLevel(Magnitude, Max), title = "Throttle Level")
+# # Continouous 
+# plot(T, ThrottleLevel(Magnitude, Max), title = "Throttle Level")
 
-# Discrete
-plot(solution.td .* t_coast, ThrottleLevel(norm.(eachcol(solution.ud)), Acceleration(solution.td .* t_coast)), title = "Throttle Level")
+# # Discrete
+# plot(solution.td .* t_burn, ThrottleLevel(norm.(eachcol(solution.ud)), Acceleration(solution.td .* t_burn)), title = "Throttle Level")
 
 
-println(solution.p[1])
+println("Coast time (s): ", solution.p[1])
+println("Burn time (s): ", t_burn)
 
 v_N =[0; 0; 0];
-println(solution.cost^0.5)
+println("Impact Velocity Magnitude (m/s): ", solution.cost^0.5)
 
 
 # using Solvers
