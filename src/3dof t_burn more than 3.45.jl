@@ -13,7 +13,7 @@ export solve
 
 function solve(algo)
     pbm = TrajectoryProblem(nothing)
-    problem_set_dims!(pbm, 6, 3, 1)
+    problem_set_dims!(pbm, 6, 3, 2)
     set_scale!(pbm)
 
     g = [0; 0; -9.80655];
@@ -63,8 +63,9 @@ function solve(algo)
 
     problem_set_guess!(
         pbm, (N, pbm) -> begin
-            t_coast = 0.0
+            t_coast = 2.0
             t_burn = 3.45
+            t_coast2 = 0.0
 
             x0 = [r_0 + v_0 * t_coast + g * t_coast^2/2; v_0 + g * t_coast];
             xf = [r_N; v_N]
@@ -72,13 +73,17 @@ function solve(algo)
             x = zeros(pbm.nx, N)
             u = zeros(pbm.nu, N)
             
-            p = [t_coast]
+            p = [t_coast; t_coast2]
 
-            for k = 1:N
-                t = (k - 1) / (N - 1) * t_burn
+            for k = 1:N-1
+                t = (k - 1) / (N - 2) * t_burn
                 x[:, k] = (t_burn - t) / t_burn * x0 + t / t_burn * xf
                 u[:, k] = [0; 0; Acceleration(t)]
             end
+
+            x[:, N] = x[:, N - 1] + [x[4:6, N - 1] * t_coast2 + g * t_coast2^2/2; g * t_coast2];
+            u[:, N] = [0; 0; 0]    
+
             return x, u, p 
         end
     )
@@ -106,15 +111,14 @@ function solve(algo)
             [zeros(3, 3); I(3)]*3.45,
         # df/dp
         (t, k, x, u, p, pbm) ->
-            zeros(pbm.nx, 1)
-    )
+            zeros(pbm.nx, 2)*3.45)
 
     # Boundary conditions
     problem_set_bc!(
         pbm, :ic, # Initial condition
         (x, p, pbm) -> x - [r_0 + v_0 * p[1] + p[1]^2 * g / 2; v_0 + p[1] * g],
         (x, p, pbm) -> I(pbm.nx), # Jacobian wrt x
-        (x, p, pbm) -> - reshape([v_0 + g * p[1]; g], :, 1) # Jacobian wrt p 
+        (x, p, pbm) -> - [[v_0 + g * p[1]; g] zeros(6, 1)] # Jacobian wrt p 
     )
     problem_set_bc!(
         pbm, :tc,  # Terminal condition
@@ -136,6 +140,11 @@ function solve(algo)
                 local t_coast = arg[1]
                 - t_coast
             end)
+            @add_constraint(
+                ocp, NONPOS, "t_coast2 >= 0", (p[2],), begin
+                    local t_coast2 = arg[1]
+                    - t_coast2
+                end)
         end)
 
     # Convex Input Constraints
@@ -147,14 +156,14 @@ function solve(algo)
                 local u = arg[1]
                 [Acceleration(t * 3.45); u]
             end)
-        end)
+        end) 
 
     # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     # :: SCvx algorithm parameters :::::::::::::::::::::::::::::::::::::::::::::::::
     # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
     if algo == :scvx
-        N = floor(Int, 3.45 / 0.1) + 1
+        N = floor(Int, 3.45 / 0.1) + 2
         Nsub = 100
         iter_max = 30
         disc_method = FOH
@@ -185,7 +194,7 @@ function solve(algo)
         scvx_pbm = Solvers.SCvx.create(pars, pbm)
         sol, history = Solvers.SCvx.solve(scvx_pbm)
     elseif algo == :ptr
-        N, Nsub = floor(Int, 3.45 / 0.1) + 1, 10 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u
+        N, Nsub = floor(Int, 3.45 / 0.1) + 2, 10 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u
         iter_max = 100
         disc_method = FOH
         wvc, wtr = 5e3, 1e-2 # wtr is important, needs to be small but too small and we get problems. 
@@ -221,7 +230,8 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     advise!(pbm, :input, 3, (-25.0, 25.0))
 
     # Parameters
-    advise!(pbm, :parameter, 1, (0.0, 2.0))
+    advise!(pbm, :parameter, 1, (0.0, 10.0))
+    advise!(pbm, :parameter, 2, (0.0, 10.0))
 
     return nothing
 end

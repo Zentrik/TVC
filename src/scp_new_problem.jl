@@ -1,7 +1,7 @@
 using Revise
 
 module scp_new_problem
-include("./3dof fixed t_burn.jl")
+include("./3dof t_burn more than 3.45.jl")
 end # module
 
 using .scp_new_problem
@@ -20,7 +20,7 @@ vct = hcat([sample(solution.uc, t) for t in LinRange(0, 1, ctres)]...)
 
 plotlyjs()
 
-t_burn = 3.45 #solution.p[2]
+t_burn = length(solution.p) >= 2 ? solution.p[2] : 3.45
 
 # Plots.plot(LinRange(0, 1, ctres) .* t_burn, xct[1:3, :]', title = "Position")
 
