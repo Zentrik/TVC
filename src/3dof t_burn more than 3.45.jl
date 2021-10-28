@@ -13,8 +13,8 @@ export solve
 
 function solve(algo)
     pbm = TrajectoryProblem(nothing)
-    problem_set_dims!(pbm, 6, 3, 2)
-    set_scale!(pbm)
+    problem_set_dims!(pbm, 6, 3, 2 + 6)
+    # set_scale!(pbm)
 
     g = [0; 0; -9.80655];
 
@@ -24,46 +24,9 @@ function solve(algo)
     r_N =[0; 0; 0];				# terminal position, m
     v_N =[0; 0; 0];				# terminal velocity, m
 
-    # problem_set_guess!(
-    #     pbm, (N, pbm) -> begin
-    #         g = [0; 0; -9.80655];
-
-    #         function rocket!(x_dot, x, p ,t)
-    #             x_dot[1:3] = x[4:6]
-    #             x_dot[4:6] = g + [0; 0; Acceleration(t)]
-    #         end
-            
-    #         tspan = (0.0, 100.0) # should be long enough for rocket to hit ground
-            
-    #         r0 = [20.0; -4.0; 30.0]
-    #         v0 = [4.0; -3.0; 0.0]
-    #         t_coast = 0.0
-    #         x0 = [r0 + v0 * t_coast + g * t_coast^2/2; v0 + g * t_coast];
-    #         prob = ODEProblem(rocket!,x0,tspan) # prob = ODEProblem(rocket!,[20; -4; 30;4; -3; 0], tspan, u0)
-            
-    #         condition(x,t,integrator) = x[3] # when zero halt integration
-    #         affect!(integrator) = terminate!(integrator)
-    #         cb = ContinuousCallback(condition,affect!)
-    #         sol = DifferentialEquations.solve(prob,Tsit5(),callback=cb)
-            
-    #         x = zeros(pbm.nx, N)
-    #         u = zeros(pbm.nu, N)
-            
-    #         t_burn = sol.t[end]
-    #         p = [t_coast; t_burn]
-
-    #         for k = 1:N
-    #             t = (k - 1) / (N - 1) * t_burn
-    #             x[:, k] = sol(t)
-    #             u[:, k] = [0; 0; Acceleration(t)]
-    #         end
-    #         return x, u, p 
-    #     end
-    # )
-
     problem_set_guess!(
         pbm, (N, pbm) -> begin
-            t_coast = 2.0
+            t_coast = 1.3220828166980647
             t_burn = 3.45
             t_coast2 = 0.0
 
@@ -73,29 +36,22 @@ function solve(algo)
             x = zeros(pbm.nx, N)
             u = zeros(pbm.nu, N)
             
-            p = [t_coast; t_coast2]
+            p = [t_coast; t_coast2; zeros(6)]
 
-            for k = 1:N-1
-                t = (k - 1) / (N - 2) * t_burn
+            for k = 1:N
+                t = (k - 1) / (N - 1) * t_burn
                 x[:, k] = (t_burn - t) / t_burn * x0 + t / t_burn * xf
                 u[:, k] = [0; 0; Acceleration(t)]
             end
 
-            x[:, N] = x[:, N - 1] + [x[4:6, N - 1] * t_coast2 + g * t_coast2^2/2; g * t_coast2];
-            u[:, N] = [0; 0; 0]    
+            p[3:8] = x[:, N] + [x[4:6, N] * t_coast2 + g * t_coast2^2/2; g * t_coast2];
 
             return x, u, p 
         end
     )
 
-    # Cost function
-    # problem_set_running_cost!(
-    #     pbm, :scvx, (t, k, x, u, p, pbm) -> #dot(x[4:6] - v_N, x[4:6] - v_N) # I don't think you can use norm, package needs to be updated or smth.
-    #     #dot([zeros(3, 1); 2 * (x[4:6] - v_N)], f(x, u) * p[2]);
-    #     #dot(x[4:6], g + u) * p[2]
-    # )
     problem_set_terminal_cost!(
-        pbm, (x, p, pbm) -> dot(x[4:6] - v_N, x[4:6] - v_N)
+        pbm, (x, p, pbm) -> dot(p[2 + 4: 2 + 6] - v_N, p[2 + 4: 2 + 6] - v_N)
     )
     # Dynamics
     problem_set_dynamics!(
@@ -111,19 +67,22 @@ function solve(algo)
             [zeros(3, 3); I(3)]*3.45,
         # df/dp
         (t, k, x, u, p, pbm) ->
-            zeros(pbm.nx, 2)*3.45)
+            zeros(pbm.nx, pbm.np)*3.45)
 
     # Boundary conditions
     problem_set_bc!(
         pbm, :ic, # Initial condition
         (x, p, pbm) -> x - [r_0 + v_0 * p[1] + p[1]^2 * g / 2; v_0 + p[1] * g],
         (x, p, pbm) -> I(pbm.nx), # Jacobian wrt x
-        (x, p, pbm) -> - [[v_0 + g * p[1]; g] zeros(6, 1)] # Jacobian wrt p 
+        (x, p, pbm) -> - [[v_0 + g * p[1]; g] zeros(6, pbm.np - 1)] # Jacobian wrt p 
     )
     problem_set_bc!(
         pbm, :tc,  # Terminal condition
-        (x, p, pbm) -> [x[3] - r_N[3]], # can't pass a scalar
-        (x, p, pbm) -> [0 0 1 0 0 0]) 
+        (x, p, pbm) -> [p[3:8] - (x + [x[4:6] * p[2] + g * p[2]^2/2; g * p[2]]); 
+                        p[2 + 3] - r_N[3]], # can't pass a scalar
+        (x, p, pbm) -> - [I(3) I(3); zeros(3, 3) I(3); zeros(1, pbm.nx)],
+        (x, p, pbm) -> [zeros(6, 1) [-(x[4:6] + g * p[2]); -g]  I(6); zeros(1, 4) 1 zeros(1, pbm.np - 5)] # Jacobian wrt p 
+    )
 
     # Convex State Constraints
     problem_set_X!(
@@ -163,7 +122,7 @@ function solve(algo)
     # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
     if algo == :scvx
-        N = floor(Int, 3.45 / 0.1) + 2
+        N = floor(Int, 3.45 / 0.1) + 1
         Nsub = 100
         iter_max = 30
         disc_method = FOH
@@ -194,7 +153,7 @@ function solve(algo)
         scvx_pbm = Solvers.SCvx.create(pars, pbm)
         sol, history = Solvers.SCvx.solve(scvx_pbm)
     elseif algo == :ptr
-        N, Nsub = floor(Int, 3.45 / 0.1) + 2, 10 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u
+        N, Nsub = floor(Int, 3.45 / 0.1) + 1, 10 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u
         iter_max = 100
         disc_method = FOH
         wvc, wtr = 5e3, 1e-2 # wtr is important, needs to be small but too small and we get problems. 

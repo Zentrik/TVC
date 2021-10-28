@@ -1,5 +1,3 @@
-using Revise
-
 module scp_new_problem
 include("./3dof t_burn more than 3.45.jl")
 end # module
@@ -51,3 +49,19 @@ println("Impact Velocity Magnitude (m/s): ", solution.cost^0.5)
 
 # using Solvers
 # fieldnames(Solvers.SCPSolution)
+
+# outfile = "X.txt"
+# open(outfile, "w") do f
+#   for i in solution.xd
+#     println(f, i)
+#   end
+# end 
+
+# outfile = "t.txt"
+# open(outfile, "w") do f
+#     println(f, 0)
+#     for i in solution.td
+#         println(f, i * t_burn + t_coast)
+#     end
+#     println(f, t_coast + t_burn + t_coast2)
+# end 
