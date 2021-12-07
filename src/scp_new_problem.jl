@@ -1,6 +1,6 @@
 module scp_new_problem
-# include("./6dof fixed t_burn.jl")
-include("./3dof fixed t_burn udotdot.jl")
+include("./6dof fixed t_burn udotdot.jl")
+# include("./3dof fixed t_burn udotdot.jl")
 end # module
 
 using .scp_new_problem
