@@ -292,7 +292,7 @@ function solve(algo)
         scvx_pbm = Solvers.SCvx.create(pars, pbm)
         sol, history = Solvers.SCvx.solve(scvx_pbm)
     elseif algo == :ptr
-        N, Nsub = floor(Int, 3.45 / 0.1) + 1, 15 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u. We set dt high so tvc_dot is low. # Nsub is how many points to use to calculate discretization between each timestep
+        N, Nsub = floor(Int, 3.45 / 0.2) + 1, 15 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u. We set dt high so tvc_dot is low. # Nsub is how many points to use to calculate discretization between each timestep
         iter_max = 20
         disc_method = FOH
         wvc, wtr = 5e3, 1e-2 # wtr is important, needs to be small but too small and we get problems. 
@@ -354,6 +354,8 @@ function print(solution)
 
     v_N = [0; 0; 0];
     println("Impact Velocity Magnitude (m/s): ", solution.cost^0.5)
+
+    println("True Impact Velocity Magnitude (m/s): ", norm(sample(solution.xc, solution.xc.t[end])[4:6]) ) # solution.xc.t[end] is just 1.0
 end
 
 function plot(solution)
