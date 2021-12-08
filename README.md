@@ -1,6 +1,10 @@
-[Roll control](Rocket/roll_control.slx) is the full simulator and a state estimator can be generaed using an example from [StateSpaceController](Rocket/StateSpaceController.m). A controller can be generate by modifying [affine LQR](Rocket/affine_controller.m) with an example from [State Space Controller](Rocket/StateSpaceController.m).
+[Roll control](Rocket/roll_control.slx) is the full simulator and a state estimator can be generated using an example from [StateSpaceController](Rocket/StateSpaceController.m). A controller can be generate by modifying [affine LQR](Rocket/affine_controller.m) with an example from [State Space Controller](Rocket/StateSpaceController.m).
 
-If I get the time, I will try to implement partial feedback linearisation and fix the guidance MPC.
+[State Space Controller](Rocket/StateSpaceController.m) will be cleaned up soon, I don't think the dynamics are right in any of the examples.
+
+Guidance for pinpoint landing is [here](https://github.com/Zentrik/scp_new_problem).
+
+If I get the time, I will try to implement partial feedback linearisation.
 
 <a href="https://www.paypal.com/paypalme/zentriktvc/5/"><img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/master/blue.svg" height="40"></a>  
 If you found my work useful, consider donating. Thanks.
