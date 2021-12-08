@@ -1,12 +1,6 @@
-# `scp_new_problem`
+# Solid Motor Optimal Landing
 
-This is a template package that you can use to implement your own optimal
-control problems, to be solved using the [SCP
-Toolbox](https://github.com/dmalyuta/scp_traj_opt/tree/jgcd). For reference,
-the package comes preloaded with a very simple Dubin's car trajectory
-generation problem with obstacle avoidance. You can feel free to remove this
-example for your own work.
+Run `]` enter, `instantiate` to install all packages and wait 10-20 minutes for that.
+Then run, e.g. [this](https://github.com/Zentrik/scp_new_problem/blob/master/src/6dof%20udotdot.ipynb), and wait a while for compilation.
 
-Are you a new user? After cloning this repository, read the
-[**tutorial**](https://www.malyuta.name/optimization/tooling/2021/07/15/scp-tutorial.html)
-for how to use this repository in conjunction with the SCP Toolbox.
+This repo uses the [SCP Toolbox](https://github.com/dmalyuta/scp_traj_opt/tree/jgcd) extensively so you may want to check out this [**tutorial**](https://www.malyuta.name/optimization/tooling/2021/07/15/scp-tutorial.html) for how to use the SCP Toolbox.
