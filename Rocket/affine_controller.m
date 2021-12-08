@@ -1,4 +1,4 @@
-function [K_x, k_0, S] = affine_controller(state, current_u)
+function [K_x, k_0, t, S] = affine_controller(state, current_u, horizon)
   persistent Ari Bri q w Inertia Mb
   
   if isempty(Ari)
@@ -26,7 +26,7 @@ function [K_x, k_0, S] = affine_controller(state, current_u)
   A = subs(Ari, q, quat);
   A = subs(A, w, ang);
   B = subs(Bri, q, quat);
-  Ari = subs(Ari, Mb, current_u);
+  A = subs(Ari, Mb, current_u);
 
   A = double(A);
   B = double(B);
@@ -35,6 +35,6 @@ function [K_x, k_0, S] = affine_controller(state, current_u)
   c = [Inertia \ (current_u - cross(ang, Inertia*ang)); qdot(2:4); quat(2:4)];
   
   Q = diag([1,1,1, 2,2,2, 1,1,1]);
-  R = diag([0.3 0.3 50]);
-  [K_x, k_0, ~, S] = Affine_LQR(A, B, Q, R, zeros(9, 1), zeros(3, 1), state, current_u, inf, c);
+  R = diag([0.3 0.3 0.6]);
+  [K_x, k_0, t, S] = Affine_LQR(A, B, Q, R, zeros(9, 1), current_u, state, current_u, horizon, c); % target current u, as we want to minise change in u.
 end

@@ -4,6 +4,13 @@
 Rocket/codegen/
 /Rocket/StateEstimatorForActuatorDelay_grt_rtw
 
+# simulink cache
+*.slxc
+
+*.mexw64
+*.original
+*.asv
+
 Paper/*
 !Paper/*.tex
 !Paper/*.sty

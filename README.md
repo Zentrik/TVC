@@ -17,6 +17,8 @@ If you found my work useful, consider donating. Thanks.
 
 [Understanding PID Control, Part 1: What is PID Control?](https://youtu.be/wkfEZmsQqiA)
 
+[Control Bootcamp](https://www.youtube.com/playlist?list=PLMrJAkhIeNNR20Mz-VpzgfQs5zrYi085m)
+
 Other videos by brian, brunton, 3b1b etc.
 
 [How to read values from mpu6050](https://www.youtube.com/watch?v=ImctYI8hgq4)
@@ -31,4 +33,15 @@ Other videos by brian, brunton, 3b1b etc.
 
 [Books Joe Barnard (BPS.space) recommends](https://www.youtube.com/watch?v=BcKL4M5Xod)
 
-[Quaternions](https://folk.uio.no/jeanra/Informatics/QuaternionsAndIMUs.html)
+[Quaternions](https://folk.uio.no/jeanra/Informatics/QuaternionsAndIMUs.html), this link seems to be dead.
+
+[Satellite Dynamics and Control in a Quaternion
+Formulation](https://orbit.dtu.dk/files/98594729/Satdyn_mb_2010f.pdf)
+
+[Great introduction to control theory](controls-in-frc.link)
+
+## Optimal Landing
+
+[SCP Toolbox and links to papers on SCvx, PTR and GuSTO]https://www.malyuta.name/optimization/tooling/2021/07/15/scp-tutorial.html
+
+[Post on GFOLD]https://tealquaternion.netlify.app/post/gfold-2007/

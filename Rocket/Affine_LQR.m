@@ -149,7 +149,7 @@ function [Q, R, c, t_final, x_d, u_d, x_0, u_0, N, Qf, nx, nu] = InputSantiser(A
   end
   [Q, R, c, x_d, u_d, x_0, u_0] = check(A, B, c, Q, R, Qf, N, t_final, x_d, u_d, x_0, u_0);
   
-  x_d = x_d - x_0; %desired state in linearised relative cooridnate system
+  x_d = x_d - x_0; % desired state in linearised relative cooridnate system
   u_d = u_d - u_0;
   
   Q_xx = Q(1:nx, 1:nx);
