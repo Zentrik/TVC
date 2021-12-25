@@ -6,9 +6,6 @@ Guidance for pinpoint landing is [here](https://github.com/Zentrik/scp_new_probl
 
 If I get the time, I will try to implement partial feedback linearisation.
 
-<a href="https://www.paypal.com/paypalme/zentriktvc/5/"><img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/master/blue.svg" height="40"></a>  
-If you found my work useful, consider donating. Thanks.
-
 # Recommended Watching
 
 [BPS.space](https://www.youtube.com/channel/UCILl8ozWuxnFYXIe2svjHhg)
