@@ -1,4 +1,4 @@
-function [K_x, k_0, t, S] = affine_control_position(state, current_u, horizon, Thrust_magnitude)
+function [K_x, k_0, t, S] = affine_controller_position(state, current_u, horizon, Thrust_magnitude)
   % for debugging affine_controller_position([rand(3, 1); zeros(3, 1); rand(4, 1)], rand(3, 1), inf, 20)
   
   persistent A_p B_p q w Inertia Mb Thrust Ve Xe

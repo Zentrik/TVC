@@ -269,3 +269,58 @@ Vn = 0.01 * eye(size(roll_control_delay_approx.C, 1));
 lqe_estimator = estim(roll_control_delay_approx, L, 1:size(roll_control_delay_approx.C, 1), 1:3);
 
 % lqr(roll_control_delay_approx.A', roll_control_delay_approx.C', Vd, Vn)';  
+
+%% No quaternion integral, velocity control with integral with HEIGHT
+q = sym('q', [4 1], 'real');
+w = sym('w', [3 1], 'real');
+I = sym('I', [3 3]);     
+Ve = sym('Ve', [3 1]);
+Xe = sym('Xe', [3 1]);
+
+Mb = sym('Moment', [3 1]);
+Thrust = sym('Thrust', 'real');
+
+syms q2dcm(qin);
+qin = sym('qin', [1 4], 'real');
+
+q2dcm(qin) = [qin(:,1).^2 + qin(:,2).^2 - qin(:,3).^2 - qin(:,4).^2 , 2.*(qin(:,2).*qin(:,3) + qin(:,1).*qin(:,4)), 2.*(qin(:,2).*qin(:,4) - qin(:,1).*qin(:,3)) ; 2.*(qin(:,2).*qin(:,3) - qin(:,1).*qin(:,4)), qin(:,1).^2 - qin(:,2).^2 + qin(:,3).^2 - qin(:,4).^2, 2.*(qin(:,3).*qin(:,4) + qin(:,1).*qin(:,2)) ; 2.*(qin(:,2).*qin(:,4) + qin(:,1).*qin(:,3)), 2.*(qin(:,3).*qin(:,4) - qin(:,1).*qin(:,2)), qin(:,1).^2 - qin(:,2).^2 - qin(:,3).^2 + qin(:,4).^2];
+
+Average_cg = 0.549556499983870; %trapz(masscgI(:, 1), masscgI(:, 5)) / masscgI(end, 1)
+rocket_length = 0.95;
+r = [0; 0; -(rocket_length - Average_cg)]; % position of motor, point where thrust force oginates
+mass = 1.061675354603240; % trapz(masscgI(:, 1), masscgI(:, 2)) / masscgI(end, 1)
+g = [0; 0; -9.80655];
+
+% r \times Thrust = Mb, if r = [0; 0; z] then Thrust = (Mb(2) / z, - Mb(1) / z, 0), then we add in z component of Thrust
+% (Mb(2) / z, - Mb(1) / z) = [0 1; -1 0] * Mb / z
+
+Thrustxy = [0 1; -1 0] * Mb(1:2) / r(3);
+Thrustz = sqrt(Thrust^2 - norm(Thrustxy)^2);
+
+Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the devative_vector
+qdot = .5 * quatmultiply(q.', [0;w].').';
+
+devative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz; Ve]; % devative of x
+x = [w; q(2:4); Ve; Xe];
+u = Mb;
+
+A = jacobian(devative_vector, x);
+B = jacobian(devative_vector, u);
+C = eye(size(A,1));
+D = zeros(size(B));
+
+Inertia = diag([0.0826975856, 0.0826975856, 2.4778e-04]);
+omega = [0;0;0];
+
+A = subs(A, I, Inertia);
+A = subs(A, w, omega);
+A = subs(A, q, [1; 0; 0; 0]);
+A = subs(A, Thrust, 10.6);
+A = subs(A, Mb, [0; 0; 0]);
+
+B = subs(B, I, Inertia);
+B = subs(B, q, [1; 0; 0; 0]);
+B = subs(B, Mb, [0; 0; 0]);
+
+A = double(A);
+B = double(B);

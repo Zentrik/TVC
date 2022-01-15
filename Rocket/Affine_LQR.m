@@ -1,27 +1,28 @@
-function [K_x, k_0, t, S_mat] = Affine_LQR(A, B, Q, R, varargin)
+function [K_x, k_0, t, S_mat] = Affine_LQR(A, B, Q, R, options)
   % u = -Kx * x - k_0
-  [Q, R, c, t_final, x_d, u_d, x_0, u_0, N, Qf, nx, nu] = InputSantiser(A, B, Q, R, varargin);
+  [A, B, Q, R, opt] = InputSantiser(A, B, Q, R, options);
+  [nu, nx] = sizes(A, B);
   
   %A = 1; B = 1; c = 0; Q = 1; R = 1; Qf = Q; N = 0; t_final = 10;
   
-  if t_final == inf
+  if opt.t_span_ode(1) == inf
     Q_xx = Q(1:nx, 1:nx);
     R_uu = R(1:nu, 1:nu);
     r_u = R(1:nu, nu + 1:end);
     q_x = Q(1:nx, nx + 1:end);
     
     %[S_xx, K_x] = icare(A, B, Q_xx, R_uu, N);
-    [K_x, S_xx] = lqr(A, B, Q_xx, R_uu, N);
-    s_x = (-(N + S_xx * B) / R_uu * B' + A') \ ((N + S_xx * B) * inv(R_uu) * r_u - S_xx * c - q_x);
+    [K_x, S_xx] = lqr(A, B, Q_xx, R_uu, opt.N);
+    s_x = (-(N + S_xx * B) / R_uu * B' + A') \ ((N + S_xx * B) \ R_uu * r_u - S_xx * opt.c - q_x);
     % q_0 = Q(nx + 1:end, nx + 1:end);
     % r_0 = R(nu + 1:end, nu + 1:end);
     % q_0 + r_0 - (r_u + B' * s_x)' / R_uu * (r_u + B' * s_x) + 2 * s_x' * c
     S = [S_xx s_x; s_x' 0];
-    [~, k_0] = affineKsoln(A, S, R, B, N);
+    [~, k_0] = affineKsoln(A, S, R, B, opt.N);
     S_mat = S;
     t = inf;
   else
-    [t, S] = ode45(@(t, S) affineSdynamics(A, B, c, Q, R, S, N), [t_final 0], Qf);
+    [t, S] = ode45(@(t, S) affineSdynamics(t, A, B, opt.c, Q, R, S, opt.N), opt.t_span_ode, opt.Qf);
     %S = reshape(S, nx + 1, nx + 1, length(t));
     %S = cellfun(@(v) reshape(v, nx + 1, nx + 1),mat2cell(S, ones(1,length(S)), (nx + 1)^2),'Uniform', 0);
 
@@ -29,9 +30,9 @@ function [K_x, k_0, t, S_mat] = Affine_LQR(A, B, Q, R, varargin)
     K_x = zeros(nu, nx, L);
     k_0 = zeros(nu, 1, L);
     S_mat = zeros(nx + 1, nx +1, L);
-    for i = 1:length(t)
-      S_mat(:, :, i) = reshape(S(i, :), nx + 1, nx + 1);
-      [K_x(:, :, i), k_0(:, :, i)] = affineKsoln(A, S_mat(:, :, i), R, B, N);
+    for k = 1:length(t)
+      S_mat(:, :, k) = reshape(S(k, :), nx + 1, nx + 1);
+      [K_x(:, :, k), k_0(:, :, k)] = affineKsoln(t(k), A, S_mat(:, :, k), R, B, opt.N);
     end
 
     S_mat = flip(S_mat, 3);
@@ -39,218 +40,222 @@ function [K_x, k_0, t, S_mat] = Affine_LQR(A, B, Q, R, varargin)
     k_0 = flip(k_0, 3);
     t = flip(t);
 
-    plot(t, reshape(K_x(1, 4, :), 1, L))
+%     plot(t, reshape(K_x(1, 4, :), 1, L))
   end
   
-  k_0 = k_0 - u_0 - pagemtimes(K_x, x_0);
+  for k = 1:length(t)
+    k_0(:, :, k) = k_0(:, :, k) - opt.u_0(t(k)) - K_x(:, :, k) * opt.x_0(t(k));
+  end
+  
+%   k_0 = k_0 - opt.u_0 - pagemtimes(K_x, opt.x_0);
 end
 
-function Sdot = affineSdynamics(A, B, c, Q, R, S, N)  
+function Sdot = affineSdynamics(t, A, B, c, Q, R, S, N)  
   [nu, nx] = sizes(A, B);
 
   S = reshape(S, nx + 1, nx + 1);
   
   S_xx = S(1:nx, 1:nx);
-  s_x = S(1:nx, nx + 1:end);
-  s_0 = S(nx + 1:end, nx + 1:end);
+  s_x  = S(1:nx, nx + 1:end);
+  s_0  = S(nx + 1:end, nx + 1:end);
   
-  Q_xx = Q(1:nx, 1:nx);
-  q_x = Q(1:nx, nx + 1:end);
-  q_0 = Q(nx + 1:end, nx + 1:end);
+  Q_xx = @(t) INDEX(Q(t), 1:nx, 1:nx);
+  q_x  = @(t) INDEX(Q(t), 1:nx, nx + 1);
+  q_0  = @(t) INDEX(Q(t), nx + 1, nx + 1);
 
-  R_uu = R(1:nu, 1:nu);
-  r_u = R(1:nu, nu + 1:end);
-  r_0 = R(nu + 1:end, nu + 1:end);
-  Ri = inv(R_uu);
+  R_uu = @(t) INDEX(R(t), 1:nu, 1:nu);
+  r_u  = @(t) INDEX(R(t), 1:nu, nu + 1);
+  r_0  = @(t) INDEX(R(t), nu + 1, nu + 1);
+  Ri   = @(t) inv(R_uu(t));
   
   if (min(eig(S_xx))<0) 
     warning('Drake:TVLQR:NegativeS','S is not positive definite'); 
   end
   
-  Sdot_xx = -(Q_xx - (N+S_xx*B)*Ri*(N+S_xx*B)' + S_xx*A + A'*S_xx);
-  rs = (r_u+B'*s_x);
-  Sdot_x = -(q_x - (N+S_xx*B)*Ri*rs + A'*s_x + S_xx*c);
-  Sdot_0 = -(q_0 + r_0 - rs'*Ri*rs + 2 * s_x'*c); % I think you can just set this to 0 no problem
+  Sdot_xx = -(Q_xx(t) - (N(t) + S_xx*B(t)) * Ri(t) * (N(t) + S_xx*B(t))' + S_xx*A(t) + A(t)'*S_xx);
+  rs = @(t) (r_u(t) + B(t)'*s_x);
+  Sdot_x = -(q_x(t) - (N(t) + S_xx*B(t)) * Ri(t) * rs(t) + A(t)'*s_x + S_xx*c(t));
+  Sdot_0 = -(q_0(t) + r_0(t) - rs(t)'*Ri(t)*rs(t) + 2 * s_x'*c(t)); % I think you can just set this to 0 no problem
     
   Sdot = [Sdot_xx, Sdot_x; Sdot_x', Sdot_0];
   Sdot = reshape(Sdot, (nx + 1)^2, 1);
 end
 
-function [K_x, k_0] = affineKsoln(A, S, R, B, N)
+function [K_x, k_0] = affineKsoln(t, A, S, R, B, N)
   [nu, nx] = sizes(A, B);
 
-  R_uu = R(1:nu, 1:nu);
-  r_u = R(1:nu, nu + 1:end);
+  R_uu = @(t) INDEX(R(t), 1:nu, 1:nu);
+  r_u  = @(t) INDEX(R(t), 1:nu, nu + 1);
   
   S_xx = S(1:nx, 1:nx);
-  s_x = S(1:nx, nx + 1:end);
+  s_x  = S(1:nx, nx + 1:end);
   
-  K_x = R_uu \ (B' * S_xx + N');
-  k_0 = R_uu \ (B' * s_x + r_u);
+  K_x = R_uu(t) \ (B(t)' * S_xx + N(t)');
+  k_0 = R_uu(t) \ (B(t)' * s_x + r_u(t));
 end
 
 function [nu, nx] = sizes(A, B)
-  nx = length(A); nu = size(B, 2);
+  nx = length(A(0)); nu = size(B(0), 2);
 end
 
-function [Q, R, c, t_final, x_d, u_d, x_0, u_0, N, Qf, nx, nu] = InputSantiser(A, B, Q, R, extra_inputs)
-  input_size = size(extra_inputs);
-  if input_size(1) == 1
-    if input_size(2) >= 1
-      x_d = extra_inputs{1};
-    end
-    if input_size(2) >= 2
-      u_d = extra_inputs{2};
-    end
-    if input_size(2) >= 3
-      x_0 = extra_inputs{3};
-    end
-    if input_size(2) >= 4
-      u_0 = extra_inputs{4};
-    end
-    if input_size(2) >= 5
-      t_final = extra_inputs{5};
-    end
-    if input_size(2) >= 6
-      c = extra_inputs{6};
-    end
-     if input_size(2) >= 7
-      N = extra_inputs{7};
-    end
-    if input_size(2) >= 8
-      Qf = extra_inputs{8};
-    end
+function [A, B, Q, R, options] = InputSantiser(A, B, Q, R, options)
+  if ~isa(A, 'function_handle') % i.e. A not a function, so just a matrix
+    A = @(t) A;
+  end
+  if ~isa(B, 'function_handle')
+    B = @(t) B;
+  end
+  if ~isa(Q, 'function_handle')
+    Q = @(t) Q;
+  end
+  if ~isa(R, 'function_handle')
+    R = @(t) R;
   end
   
   [nu, nx] = sizes(A, B);
-  if ~exist('c', 'var')
-    c = zeros(nx, 1);
-  end
-  if ~exist('t_final', 'var')
-    t_final = inf;
-  end
-  if ~exist('x_d', 'var')
-    x_d = zeros(nx, 1);
-  end
-  if ~exist('u_d', 'var')
-    u_d = zeros(nu, 1);
-  end
-  if ~exist('x_0', 'var')
-    x_0 = zeros(nx, 1);
-  end
-  if ~exist('u_0', 'var')
-    u_0 = zeros(nu, 1);
-  end
-  if ~exist('N', 'var')
-    N = zeros(nx, nu);
-  end
-  if ~exist('Qf', 'var')
-    Qf = zeros(nx+1);
-  end
-  [Q, R, c, x_d, u_d, x_0, u_0] = check(A, B, c, Q, R, Qf, N, t_final, x_d, u_d, x_0, u_0);
   
-  x_d = x_d - x_0; % desired state in linearised relative cooridnate system
-  u_d = u_d - u_0;
+  if ~exist('options.x_0', 'var')
+    options.x_0 = zeros(nx, 1);
+  end
+  if ~exist('options.u_0', 'var')
+    options.u_0 = zeros(nu, 1);
+  end
+  if ~exist('options.x_d', 'var')
+    options.x_d = options.x_0;
+  end
+  if ~exist('options.u_d', 'var')
+    options.u_d = options.u_0;
+  end
+  if ~exist('options.c', 'var')
+    options.c = zeros(nx, 1);
+  end
+  if ~exist('options.N', 'var')
+    options.N = zeros(nx, nu);
+  end
   
-  Q_xx = Q(1:nx, 1:nx);
-  q_x = Q(1:nx, nx + 1:end);
-  q_0 = Q(nx + 1:end, nx + 1:end);
+  if ~isa(options.x_0, 'function_handle')
+    options.x_0 = @(t) options.x_0;
+  end
+  if ~isa(options.u_0, 'function_handle')
+    options.u_0 = @(t) options.u_0;
+  end
+  if ~isa(options.x_d, 'function_handle')
+    options.x_d = @(t) options.x_d;
+  end
+  if ~isa(options.u_d, 'function_handle')
+    options.u_d = @(t) options.u_d;
+  end
+  if ~isa(options.c, 'function_handle')
+    options.c = @(t) options.c;
+  end
+  if ~isa(options.N, 'function_handle')
+    options.N = @(t) options.N;
+  end
+  
+  if ~exist('options.Qf', 'var')
+    options.Qf = zeros(nx+1);
+  end
+  
+  [Q, R, options] = check(A, B, Q, R, options);
+  
+  options.x_d = @(t) options.x_d(t) - options.x_0(t); % desired state in linearised relative cooridnate system
+  options.u_d = @(t) options.u_d(t) - options.u_0(t);
+  
+  Q_xx = @(t) INDEX(Q(t), 1:nx, 1:nx);
+  q_x  = @(t) INDEX(Q(t), 1:nx, nx + 1);
+  q_0  = @(t) INDEX(Q(t), nx + 1, nx + 1);
 
-  R_uu = R(1:nu, 1:nu);
-  r_u = R(1:nu, nu + 1:end);
-  r_0 = R(nu + 1:end, nu + 1:end);
+  R_uu = @(t) INDEX(R(t), 1:nu, 1:nu);
+  r_u  = @(t) INDEX(R(t), 1:nu, nu + 1);
+  r_0  = @(t) INDEX(R(t), nu + 1, nu + 1);
   
-  Q(1:nx, nx + 1:end) = q_x - Q_xx * x_d - N * u_d;
-  Q(nx + 1:end, 1:nx) = Q(1:nx, nx + 1:end)';
-  Q(nx + 1:end, nx + 1:end) = q_0 + x_d' * Q_xx * x_d + 2 * x_d' * N * u_d;
+  q_x_tmp = @(t) q_x(t) - Q_xx(t) * options.x_d(t) - options.N(t) * options.u_d(t);
+  q_0_tmp = @(t) q_0(t) + options.x_d(t)' * Q_xx(t) * options.x_d(t) + 2 * options.x_d(t)' * options.N(t) * options.u_d(t);
   
-  R(1:nu, nu + 1:end) = r_u - R_uu * u_d - N' * x_d;
-  R(nu + 1:end, 1:nu) = R(1:nu, nu + 1:end)';
-  R(nu + 1:end, nu + 1:end) = r_0 + u_d' * R_uu * u_d;
+  Q = @(t) [Q_xx(t) q_x_tmp(t); q_x_tmp(t)' q_0_tmp(t)];
+  
+  r_u_tmp = @(t) r_u(t) - R_uu(t) * options.u_d(t) - options.N(t)' * options.x_d(t);
+  r_0_tmp = @(t) r_0(t) + options.u_d(t)' * R_uu(t) * options.u_d(t);
+  
+  R = @(t) [R_uu(t) r_u_tmp(t); r_u_tmp(t)' r_0_tmp(t)];
 end
 
-function [Q, R, c, x_d, u_d, x_0, u_0] = check(A, B, c, Q, R, Qf, N, t_final, x_d, u_d, x_0, u_0)
+function [Q, R, options] = check(A, B, Q, R, options)
   [nu, nx] = sizes(A, B);
 
-  error(abcdchk(A, B));
+  error(abcdchk(A(0), B(0)));
 
-  if isa(Q,'double')
-    if size(Q) == [nx nx]
-      Q = [Q zeros(nx, 1); zeros(1, nx) 0];
+  if isa(Q(0),'double')
+    if isequal(size(Q(0)), [nx nx])
+      Q = @(t) [Q(t) zeros(nx, 1); zeros(1, nx) 0];
     end
-    sizecheck(Q,[nx + 1,nx + 1], 'Q');
+    sizecheck(Q(0),[nx + 1, nx + 1], 'Q');
   else
     error('Q must be a double');
   end
-
-  if (isa(R,'double'))
-    if size(R) == [nu nu]
-      R = [R zeros(nu, 1); zeros(1, nu) 0];
+  
+  if isa(R(0),'double')
+    if isequal(size(R(0)), [nu nu])
+      R = @(t) [R(t) zeros(nu, 1); zeros(1, nu) 0];
     end
-    sizecheck(R,[nu + 1,nu + 1], 'R');
+    sizecheck(R(0),[nu + 1, nu + 1], 'R');
   else
     error('R must be a double');
   end
 
-  if isa(Qf,'double')
-    sizecheck(Qf,[nx + 1,nx + 1], 'Qf');
+  if isa(options.Qf,'double')
+    sizecheck(options.Qf,[nx + 1,nx + 1], 'Qf');
   else
     error('Qf must be a double');
   end
 
-  if isa(N,'double')
-    sizecheck(N,[nx,nu], 'N');
+  if isa(options.N(0),'double')
+    sizecheck(options.N(0),[nx,nu], 'N');
   else
     error('N must be a double');
   end
   
-  if isa(c,'double')
-    if size(c) == [1 nx]
-      c = c';
+  if isa(options.c(0),'double')
+    if isequal(size(options.c(0)), [1 nx])
+      options.c = @(t) options.c(t)';
     end
-    sizecheck(c,[nx,1], 'c');
+    sizecheck(options.c(0), [nx,1], 'options.c');
   else
     error('c must be a double');
   end
   
-  if isa(t_final,'double')
-    sizecheck(t_final, [1,1], 't_final');
-  else
-    error('t_final must be a double');
-  end
-  
-  if isa(x_d,'double')
-    if size(x_d) == [1 nx]
-      x_d = x_d';
+  if isa(options.x_d(0),'double')
+    if isequal(size(options.x_d(0)), [1 nx])
+      options.x_d = @(t) options.x_d(t)';
     end
-    sizecheck(x_d, [nx,1], 'x_d');
+    sizecheck(options.x_d(0), [nx,1], 'options.x_d');
   else
     error('x_d must be a double');
   end
   
-  if isa(u_d,'double')
-    if size(u_d) == [1 nu]
-      u_d = u_d';
+  if isa(options.u_d(0),'double')
+    if isequal(size(options.u_d(0)), [1 nu])
+      options.u_d = @(t) options.u_d(t)';
     end
-    sizecheck(u_d, [nu,1], 'u_d');
+    sizecheck(options.u_d(0), [nu,1], 'options.u_d');
   else
     error('u_d must be a double');
   end
   
-  if isa(x_0,'double')
-    if size(x_0) == [1 nx]
-      x_0 = x_0';
+  if isa(options.x_0(0),'double')
+    if isequal(size(options.x_0(0)), [1 nx])
+      options.x_0 = @(t) options.x_0(t)';
     end
-    sizecheck(x_0, [nx,1], 'x_0');
+    sizecheck(options.x_0(0), [nx,1], 'options.x_0');
   else
     error('x_0 must be a double');
   end
   
-  if isa(u_0,'double')
-    if size(u_0) == [1 nu]
-      u_0 = u_0';
+  if isa(options.u_0(0),'double')
+    if isequal(size(options.u_0(0)), [1 nu])
+      options.u_0 = @(t)options.u_0(t)';
     end
-    sizecheck(u_0, [nu,1], 'u_0');
+    sizecheck(options.u_0(0), [nu,1], 'options.u_0');
   else
     error('u_0 must be a double');
   end
@@ -260,4 +265,8 @@ function sizecheck(Variable, Size, Name)
   if ~isequal(size(Variable), Size)
     error(join([Name, 'should be', '[', string(Size(1)), ',', string(Size(2)), ']', 'Size']));
   end
+end
+
+function out = INDEX(Matrix, R, C)
+  out =  Matrix(R,C);
 end
