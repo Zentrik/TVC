@@ -1,0 +1,4 @@
+/figures/*.pdf
+output/
+*.npy
+src/*.csv
