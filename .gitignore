@@ -38,3 +38,10 @@ Backup of *.doc*
 Rocket/KalmanFilterBasic_grt_rtw/
 Rocket/*.mat
 .DS_Store
+
+# Guidance
+Guidance/figures/*.pdf
+Guidance/output/
+Guidance/src/*.csv
+
+*.npy

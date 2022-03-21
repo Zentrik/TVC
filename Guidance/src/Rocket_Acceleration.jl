@@ -1,8 +1,8 @@
 using XLSX, Interpolations
 
-ThrustTable = XLSX.readdata("$(@__DIR__)/../data/F15_Thrust.xlsx", "Sheet1!A1:B27"); # $(@__DIR__) gives directory of Rocket_Acceleration.jl
-MassTable = XLSX.readdata("$(@__DIR__)/../data/mass,cg,I.xlsx", "mass,cg,I!A2:B3608");
-CGTable = [XLSX.readdata("$(@__DIR__)/../data/mass,cg,I.xlsx", "mass,cg,I!A2:A3608") XLSX.readdata("$(@__DIR__)/../data/mass,cg,I.xlsx", "mass,cg,I!E2:E3608")]
+ThrustTable = XLSX.readdata("$(@__DIR__)/../../Rocket/F15_Thrust.xlsx", "Sheet1!A1:B27"); # $(@__DIR__) gives directory of Rocket_Acceleration.jl
+MassTable = XLSX.readdata("$(@__DIR__)/../../Rocket/mass,cg,I.xlsx", "mass,cg,I!A2:B3608");
+CGTable = [XLSX.readdata("$(@__DIR__)/../../Rocket/mass,cg,I.xlsx", "mass,cg,I!A2:A3608") XLSX.readdata("$(@__DIR__)/../../Rocket/mass,cg,I.xlsx", "mass,cg,I!E2:E3608")]
 
 ThrustInterp = LinearInterpolation(ThrustTable[:, 1], ThrustTable[:, 2], extrapolation_bc=0)
 MassInterp = LinearInterpolation(MassTable[:, 1], MassTable[:, 2], extrapolation_bc=Flat())
