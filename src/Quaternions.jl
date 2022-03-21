@@ -107,5 +107,5 @@ end
 
 function to_matrix(quat)
     #return quatR(conjugate(quat)) * quatL(quat) [2:4, 2:4]
-    return (quat[1]^2 - quat[2:4] ⋅ quat[2:4]) * I(3) + 2 * quat[2:4] * quat[2:4]' + 2 * quat[1] * skew(quat[2:4]) # note, quat[2:4] * quat[2:4]' gives a matric
+    return (quat[1]^2 - quat[2:4] ⋅ quat[2:4]) * I(3) + 2 * quat[2:4] * quat[2:4]' + 2 * quat[1] * skew(quat[2:4]) # note, quat[2:4] * quat[2:4]' gives a matrix
 end

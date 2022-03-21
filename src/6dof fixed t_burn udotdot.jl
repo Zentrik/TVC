@@ -12,6 +12,7 @@ include("./Quaternions.jl")
 
 using Plots
 using NPZ
+using DelimitedFiles
 
 export solve, print, plot, save
 
@@ -22,6 +23,8 @@ w_0 = [0; 0; 0]
 T_0 = [0; 0; 1] # acceleration from Thrust normalised
 Tdot_0 = [0; 0; 0]
 
+g = [0; 0; -9.80655];
+
 # Per Successive Convexification for Mars 6-DoF Powered Descent Landing Guidance, 2017. Set control to second derivative of thrust vector
 # This allows me to add a constraint on the tvc gimbal rate and it adds more degrees of freedom on the control/ allows for more complex control for a given N (no. of discretisation steps) improving cost.
 
@@ -30,8 +33,6 @@ function solve(algo)
     pbm = TrajectoryProblem(nothing)
     problem_set_dims!(pbm, 19, 4, 1)
     set_scale!(pbm)
-
-    g = [0; 0; -9.80655];
 
     r_N =[0; 0; 0];				# terminal position, m
     v_N =[0; 0; 0];				# terminal velocity, m
@@ -70,15 +71,14 @@ function solve(algo)
         pbm, (x, p, pbm) -> dot(x[4:6] - v_N, x[4:6] - v_N)
     )
     
-    Id = Diagonal([0.2, 0.2, 0.04])
-    invId = Diagonal([5.0, 5.0, 25.0])
-    g = [0; 0; -9.80655]
+    Id = Diagonal([0.0826975856, 0.0826975856, 2.4778e-04])
+    # invId = Diagonal([5.0, 5.0, 25.0])
 
     ## Testing Jacobians
     # using Symbolics, LinearAlgebra
     # include("src/Quaternions.jl") 
 
-    # @variables r[1:3] v[1:3] u[1:4] quat[1:4] w[1:3] T[1:3] T_dot[1:3] Thrust;
+    # @variables r[1:3] v[1:3] u[1:4] quat[1:4] w[1:3] T[1:3] T_dot[1:3] Acceleration mass;
     # r = Symbolics.scalarize(r);
     # v = Symbolics.scalarize(v);
     # quat = Symbolics.scalarize(quat);
@@ -90,7 +90,7 @@ function solve(algo)
 
     # x = [r; v; quat; w; T; T_dot];
     
-    # x_dot = [v; g + rotate(quat, T) * Thrust; 1/2 * quatL(quat) * [0; w]; invId * (cross([0; 0; -0.5], T * Thrust) + [0; 0; u[4]] - cross(w, Id * w)); T_dot; u[1:3]]
+    # x_dot = [v; g + rotate(quat, T) * Acceleration; 1/2 * quatL(quat) * [0; w]; invId * (cross([0; 0; -0.4], T * Acceleration * mass) + [0; 0; u[4]] - cross(w, Id * w)); T_dot; u[1:3]]
     # A_sym = Symbolics.jacobian(x_dot, x)
     # B_sym = Symbolics.jacobian(x_dot, u)
 
@@ -98,7 +98,7 @@ function solve(algo)
     # A = build_function(A_sym, x, u, Thrust, expression=Val{false})[1]
     # B = build_function(B_sym, x, u, Thrust, expression=Val{false})[1]   
     
-    function f_t(x, u, Thrust)
+    function f_t(x, u, Acceleration, Thrust)
         r = x[1:3]
         v = x[4:6]
         quat = x[7:10]
@@ -106,10 +106,10 @@ function solve(algo)
         T = x[14:16]
         T_dot = x[17:19]
 
-        return [v; g + rotate(quat, T) * Thrust; 1/2 * quatL(quat) * [0; w]; invId * (cross([0; 0; -0.5], T * Thrust) + [0; 0; u[4]] - cross(w, Id * w)); T_dot; u[1:3]]
+        return [v; g + rotate(quat, T) * Acceleration; 1/2 * quatL(quat) * [0; w]; Id \ (cross([0; 0; -0.4], T * Thrust) + [0; 0; u[4]] - cross(w, Id * w)); T_dot; u[1:3]]
     end
 
-    function A_t(x, u, Thrust)
+    function A_t(x, u, Acceleration, Thrust)
         r = x[1:3]
         v = x[4:6]
         quat = x[7:10]
@@ -119,21 +119,21 @@ function solve(algo)
 
         A = zeros(19, 19)
         A[1:3, 4:6] = I(3)
-        A[4:6, 7] = Thrust * 2 * (quat[1] * T + quat[2:4] × T)
-        A[4:6, 8:10] = Thrust * 2 * (quat[2:4]' * T * I(3) + quat[2:4] * T' - T * quat[2:4]' - quat[1] * skew(T))
-        A[4:6, 14:16] = Thrust * to_matrix(quat)
+        A[4:6, 7] = Acceleration * 2 * (quat[1] * T + quat[2:4] × T)
+        A[4:6, 8:10] = Acceleration * 2 * (quat[2:4]' * T * I(3) + quat[2:4] * T' - T * quat[2:4]' - quat[1] * skew(T))
+        A[4:6, 14:16] = Acceleration * to_matrix(quat)
         A[7:10, 7:10] = 1/2 * quatR([0; ω])
         A[7:10, 11:13] = 1/2 * quatL(quat)[:, 2:4]
-        A[11:13, 11:13] = - invId * (skew(ω) * Id - skew(Id * ω))
-        A[11:13, 14:16] = invId * skew([0; 0; -0.5]) * Thrust
+        A[11:13, 11:13] = - Id \ (skew(ω) * Id - skew(Id * ω))
+        A[11:13, 14:16] = Id \ skew([0; 0; -0.4]) * Thrust
         A[14:16, 17:19] = I(3)
 
         return A
     end
 
-    function B_t(x, u, Thrust)
+    function B_t(x, u, Acceleration, Thrust)
         B = zeros(19, 4)
-        B[11:13, 4] = invId[:, 3]
+        B[11:13, 4] = inv(Id)[:, 3]
         B[17:19, 1:3] = I(3)
 
         return B
@@ -150,11 +150,11 @@ function solve(algo)
     problem_set_dynamics!(
         pbm,
         # f
-        (t, k, x, u, p, pbm) -> f_t(x, u, Acceleration(t * 3.45)) * 3.45,
+        (t, k, x, u, p, pbm) -> f_t(x, u, Acceleration(t * 3.45), Thrust(t * 3.45)) * 3.45,
         # df/dx
-        (t, k, x, u, p, pbm) -> A_t(x, u, Acceleration(t * 3.45)) * 3.45,
+        (t, k, x, u, p, pbm) -> A_t(x, u, Acceleration(t * 3.45), Thrust(t * 3.45)) * 3.45,
         # df/du
-        (t, k, x, u, p, pbm) -> B_t(x, u, Acceleration(t * 3.45)) * 3.45,
+        (t, k, x, u, p, pbm) -> B_t(x, u, Acceleration(t * 3.45), Thrust(t * 3.45)) * 3.45,
         # df/dp
         (t, k, x, u, p, pbm) ->
             zeros(pbm.nx, pbm.np)*3.45)
@@ -203,9 +203,9 @@ function solve(algo)
             end)
 
         @add_constraint(
-            ocp, NONPOS, "t_coast >= 0", (p[1],), begin
+            ocp, NONPOS, "t_coast >= expected ignition time", (p[1],), begin
                 local t_coast = arg[1]
-                - t_coast
+                (0.7 - 0.419) - t_coast[1] # varies from 0.605 - 0.419 to 0.8 - 0.419
             end)
 
         @add_constraint(
@@ -292,7 +292,7 @@ function solve(algo)
         scvx_pbm = Solvers.SCvx.create(pars, pbm)
         sol, history = Solvers.SCvx.solve(scvx_pbm)
     elseif algo == :ptr
-        N, Nsub = floor(Int, 3.45 / 0.2) + 1, 15 # see LanderSolid.m, dt needs to be low. We need many degrees of freedom on u. We set dt high so tvc_dot is low. # Nsub is how many points to use to calculate discretization between each timestep
+        N, Nsub = floor(Int, 3.45 / 0.1) + 1, 15 # dt can be set to 0.2 or even higher with little decrease in cost (velocity will only be a bit higher).
         iter_max = 20
         disc_method = FOH
         wvc, wtr = 5e3, 1e-2 # wtr is important, needs to be small but too small and we get problems. 
@@ -355,7 +355,7 @@ function print(solution)
     v_N = [0; 0; 0];
     println("Impact Velocity Magnitude (m/s): ", solution.cost^0.5)
 
-    println("True Impact Velocity Magnitude (m/s): ", norm(sample(solution.xc, solution.xc.t[end])[4:6]) ) # solution.xc.t[end] is just 1.0
+    println("True Impact Velocity Magnitude (m/s): ", norm(sample(solution.xc, solution.xc.t[end])[4:6]) ) # solution.xc.t[end] is just 1.0, solution.xc[3] at end isn't 0.
 end
 
 function plot(solution)
@@ -391,6 +391,21 @@ end
 function save(solution)
     N = size(solution.xd)[2]
     npzwrite("x.npy", transpose([[r_0; v_0; q_0; w_0] solution.xd[1:13, :]]) .- [solution.xd[1:3, end]' .* ones(N + 1, 3) zeros(N + 1, 10)]) # set final position to 0, so rocket lands on pad.
-    npzwrite("u.npy", [T_0' * 0; solution.xd[14:16, :]' .* Acceleration(solution.td * 3.45)] )
+    npzwrite("u.npy", [T_0' * 0; solution.xd[14:16, :]' .* Thrust(solution.td * 3.45)] )
     npzwrite("t.npy", transpose([0; solution.p[1] .+ 3.45 * solution.td]))
+
+    # Save for simulink 
+
+    t_fine = 0:0.01:3.45
+    x_fine = transpose(reduce(hcat, sample.(Ref(solution.xc), t_fine / max(t_fine...)))) # so we can do linear interpolation in matlab and be accurate
+    u_fine = transpose(reduce(hcat, sample.(Ref(solution.uc), t_fine / max(t_fine...))))
+    writedlm("x.csv", hcat(t_fine, x_fine[:, 1:13]), ',')
+
+    Moments = zeros(length(t_fine), 3)
+    for (k, t) in enumerate(t_fine)
+        Moments[k, :] = cross([0; 0; -(0.95 - CG(t))], x_fine[k, 14:16]) * Thrust(t) + [0; 0; u_fine[k, 4]]
+    end
+    writedlm("moments.csv", hcat(t_fine, Moments), ',')
+
+    writedlm("u.csv", hcat([0; solution.p[1] - 1e-10; solution.p[1] .+ 3.45 * solution.td], [[0 0 0 0]; [0 0 0 0]; solution.ud']), ',')
 end
