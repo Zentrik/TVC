@@ -8,7 +8,7 @@ function quatL(quat)
     S += quat[1] * I(4)
     
     S[2:4, 1] = quat[2:4]
-    S[1, 2:4] = -quat[2:4]
+    S[1, 2:4] = -S[2:4, 1]
     S[2:4, 2:4] += skew(quat[2:4])
 
     return S
@@ -19,7 +19,7 @@ function quatR(quat)
     S += quat[1] * I(4)
     
     S[2:4, 1] = quat[2:4]
-    S[1, 2:4] = -quat[2:4]
+    S[1, 2:4] = -S[2:4, 1]
     S[2:4, 2:4] -= skew(quat[2:4])
 
     return S

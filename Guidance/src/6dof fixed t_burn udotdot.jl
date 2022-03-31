@@ -1,8 +1,6 @@
 # TODO: Make quaternion discretisation more accurate. Without constraint on quaternion norm, the norm of the quaternion strays from 1, I think this is due to the Jacobians of dynamics being evaluated about a reference trajectory that has non unit quaternions.
 
-using Solvers
-using Parser
-using Utils
+using SCPToolbox
 
 using LinearAlgebra
 using ECOS
@@ -16,20 +14,16 @@ using DelimitedFiles
 
 export solve, print, plot, save
 
-r_0 = [20; -4; 30];	# position vector, m
-v_0 = [4; -3; 0];		# velocity vector, m/s
-q_0 = [1; 0; 0; 0];
-w_0 = [0; 0; 0]
-T_0 = [0; 0; 1] # acceleration from Thrust normalised
-Tdot_0 = [0; 0; 0]
-
-g = [0; 0; -9.80655];
+const g = [0; 0; -9.80655];
 
 # Per Successive Convexification for Mars 6-DoF Powered Descent Landing Guidance, 2017. Set control to second derivative of thrust vector
 # This allows me to add a constraint on the tvc gimbal rate and it adds more degrees of freedom on the control/ allows for more complex control for a given N (no. of discretisation steps) improving cost.
 
+function solve(algo, x)
+    solve(algo, x[1:3], x[4:6], x[7:10], x[11:13], x[14:16], x[17:19])
+end
 
-function solve(algo)
+function solve(algo, r_0=[20; -4; 30], v_0=[4; -3; 0], q_0=[1; 0; 0; 0], w_0=zeros(3), T_0=[0; 0; 1], Tdot_0=zeros(3))
     pbm = TrajectoryProblem(nothing)
     problem_set_dims!(pbm, 19, 4, 1)
     set_scale!(pbm)
@@ -40,7 +34,6 @@ function solve(algo)
     w_N = [0; 0; 0];
 
     T_N = [0; 0; 1]
-    Tdot_0 = [0; 0; 0]
 
     problem_set_guess!(
         pbm, (N, pbm) -> begin
@@ -205,7 +198,7 @@ function solve(algo)
         @add_constraint(
             ocp, NONPOS, "t_coast >= expected ignition time", (p[1],), begin
                 local t_coast = arg[1]
-                (0.7 - 0.419) - t_coast[1] # varies from 0.605 - 0.419 to 0.8 - 0.419
+                (0.7 - 0.419) - t_coast # varies from 0.605 - 0.419 to 0.8 - 0.419
             end)
 
         @add_constraint(
@@ -281,7 +274,7 @@ function solve(algo)
         q_exit = Inf
         solver = ECOS
         solver_options = Dict("verbose"=>0, "maxit"=>1000)
-        pars = Solvers.SCvx.Parameters(N, Nsub, iter_max, disc_method, λ, ρ_0, ρ_1, ρ_2, β_sh, β_gr,
+        pars = SCvx.Parameters(N, Nsub, iter_max, disc_method, λ, ρ_0, ρ_1, ρ_2, β_sh, β_gr,
                             η_init, η_lb, η_ub, ε_abs, ε_rel, feas_tol, q_tr,
                             q_exit, solver, solver_options)
 
@@ -289,8 +282,8 @@ function solve(algo)
         # :: Solve trajectory generation problem ::::::::::::::::::::::::::::::::::::::
         # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-        scvx_pbm = Solvers.SCvx.create(pars, pbm)
-        sol, history = Solvers.SCvx.solve(scvx_pbm)
+        scvx_pbm = SCvx.create(pars, pbm)
+        sol, history = SCvx.solve(scvx_pbm)
     elseif algo == :ptr
         N, Nsub = floor(Int, 3.45 / 0.1) + 1, 15 # dt can be set to 0.2 or even higher with little decrease in cost (velocity will only be a bit higher).
         iter_max = 20
@@ -301,12 +294,12 @@ function solve(algo)
         q_tr = Inf
         q_exit = Inf
         solver, options = ECOS, Dict("verbose"=>0)
-        pars = Solvers.PTR.Parameters(
+        pars = PTR.Parameters(
             N, Nsub, iter_max, disc_method, wvc, wtr, ε_abs,
             ε_rel, feas_tol, q_tr, q_exit, solver, options)
         # Create and solve the problem
-        ptr_pbm = Solvers.PTR.create(pars, pbm)
-        sol, history = Solvers.PTR.solve(ptr_pbm)
+        ptr_pbm = PTR.create(pars, pbm)
+        sol, history = PTR.solve(ptr_pbm)
     end
     return sol
 end
@@ -388,7 +381,7 @@ function plot(solution)
     # Plots.plot(t, [rad2deg(norm(sample(solution.uc, k)[1:3])) for k in t / t_burn], title = "TVC Acceleration")
 end
 
-function save(solution)
+function save(solution, r_0=[20; -4; 30], v_0=[4; -3; 0], q_0=[1; 0; 0; 0], w_0=zeros(3), T_0=[0; 0; 1])
     N = size(solution.xd)[2]
     npzwrite("x.npy", transpose([[r_0; v_0; q_0; w_0] solution.xd[1:13, :]]) .- [solution.xd[1:3, end]' .* ones(N + 1, 3) zeros(N + 1, 10)]) # set final position to 0, so rocket lands on pad.
     npzwrite("u.npy", [T_0' * 0; solution.xd[14:16, :]' .* Thrust(solution.td * 3.45)] )

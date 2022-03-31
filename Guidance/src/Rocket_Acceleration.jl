@@ -4,12 +4,10 @@ ThrustTable = XLSX.readdata("$(@__DIR__)/../../Rocket/F15_Thrust.xlsx", "Sheet1!
 MassTable = XLSX.readdata("$(@__DIR__)/../../Rocket/mass,cg,I.xlsx", "mass,cg,I!A2:B3608");
 CGTable = [XLSX.readdata("$(@__DIR__)/../../Rocket/mass,cg,I.xlsx", "mass,cg,I!A2:A3608") XLSX.readdata("$(@__DIR__)/../../Rocket/mass,cg,I.xlsx", "mass,cg,I!E2:E3608")]
 
-ThrustInterp = LinearInterpolation(ThrustTable[:, 1], ThrustTable[:, 2], extrapolation_bc=0)
-MassInterp = LinearInterpolation(MassTable[:, 1], MassTable[:, 2], extrapolation_bc=Flat())
+Thrust = LinearInterpolation(ThrustTable[:, 1], ThrustTable[:, 2], extrapolation_bc=0)
+Mass = LinearInterpolation(MassTable[:, 1], MassTable[:, 2], extrapolation_bc=Flat())
 CG = LinearInterpolation(CGTable[:, 1], CGTable[:, 2], extrapolation_bc=Flat())
 
-Thrust(t) = ThrustInterp(t) 
-Mass(t) = MassInterp(t)
 Acceleration(t) = Thrust(t) / Mass(t)
 
 function ThrottleLevel(u_norm, norm_max)
