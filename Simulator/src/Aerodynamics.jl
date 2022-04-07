@@ -1,22 +1,23 @@
 using LinearAlgebra
+include("../../Guidance/src/Quaternions.jl")
 
-function CalculateAero!(Forces, Moments, rocket, atmos, ω, height)
-    Airspeed = rotate(conjugate(quat), v) + atmos.wind
+function CalculateAero!(Forces, Moments, rocket, atmos, wind, v, quat, ω, height, t)
+    Airspeed = rotate(conjugate(quat), v + wind)
     DynamicPressure = atmos.density(height) * norm(Airspeed)^2 / 2
     AoA = acos(Airspeed[3] / norm(Airspeed))
     Mach = norm(Airspeed) / atmos.speedOfSound(height)
 
     lengtha = norm(Airspeed[1:2])
     
-    cosa = Airspeed(1) / lengtha;
-    sina = Airspeed(2) / lengtha;
+    cosa = Airspeed[1] / lengtha;
+    sina = Airspeed[2] / lengtha;
 
-    ThetaRotation = [cosa, -sina, 0; sina, cosa, 0; 0, 0, 1];
+    ThetaRotation = [cosa -sina 0; sina cosa 0; 0 0 1]
 
     ω_local = ThetaRotation \ ω # ω in wind coordinates?
 
-    (CN, Cpitch) = PitchNormalCD(rocket, Mach, AoA, ω_local[2], Airspeed)
-    Caxial = CalculateCD(rocket, atmos, Mach, AoA, height)
+    (CN, Cpitch) = PitchNormalCD(rocket, Mach, AoA, ω_local[2], Airspeed, t)
+    Caxial = CalculateCD(rocket, atmos, Mach, AoA, Airspeed, height)
     Cyaw = 0
     Croll = 0
     Cside = 0
@@ -25,7 +26,7 @@ function CalculateAero!(Forces, Moments, rocket, atmos, ω, height)
     Moments += ThetaRotation * (DynamicPressure * rocket.Reference_Area * rocket.Reference_Diameter * [-Cyaw; Cpitch; Croll])
 end
 
-function PitchNormalCD(rocket, Mach, AoA, pitchrate, Airspeed)
+function PitchNormalCD(rocket, Mach, AoA, pitchrate, Airspeed, t)
     if Mach < 0.05 && AoA > pi/4 
         cnmul = (Mach/0.05)^2;
     else
@@ -43,12 +44,12 @@ function PitchNormalCD(rocket, Mach, AoA, pitchrate, Airspeed)
     mul = 3 * (rocket.PitchCenterX^4 + (rocket.NoseCone_Length + rocket.BodyTube_Length - rocket.PitchCenterX)^4 ) * (.275 * cacheDiameter / (rocket.Reference_Area * rocket.Reference_Diameter));
     PitchDampingMomentCD = min( ( mul * ( pitchrate / norm(Airspeed) )^2 ) , CNCPxL ) * sign(pitchrate);
 
-    CNCmxL = NormalForceCD * rocket.CenterOfMassX / rocket.Reference_Diameter;
+    CNCmxL = NormalForceCD * rocket.CG(t) / rocket.Reference_Diameter;
     PitchMomentCD = CNCPxL - CNCmxL - PitchDampingMomentCD;
     return (NormalForceCD, PitchMomentCD)
 end
 
-function CalculateCD(rocket, atmos, Mach, AoA, height)
+function CalculateCD(rocket, atmos, Mach, AoA, Airspeed, height)
     Cbase = .12 + .13*Mach^2;
     CFrictionDrag = CalculateFrictionDrag(rocket, atmos, Airspeed, Mach, height)
     Cpressure = PressureDragForce(rocket);
@@ -66,8 +67,8 @@ function CalculateFrictionDrag(rocket, atmos, Airspeed, Mach, height)
     Cfc1 = Cf * c1;
     
     RoughnessCorrection = c1;
-    NoseCone_RoughnessLimited = .032 * (rocket.Roughness / rocket.NoseCone_Length)^0.2 * RoughnessCorrection;
-    BodyTube_RoughnessLimited = .032 * (rocket.Roughness / rocket.BodyTube_Length)^0.2 * RoughnessCorrection;
+    NoseCone_RoughnessLimited = .032 * (rocket.SurfaceRoughness / rocket.NoseCone_Length)^0.2 * RoughnessCorrection;
+    BodyTube_RoughnessLimited = .032 * (rocket.SurfaceRoughness / rocket.BodyTube_Length)^0.2 * RoughnessCorrection;
     
     NoseCone_Cf = max(Cfc1, NoseCone_RoughnessLimited);
     BodyTube_Cf = max(Cfc1, BodyTube_RoughnessLimited);
@@ -90,12 +91,12 @@ function AxialDragMul(AoA)
     p2 = deg2rad(90);
 
     # AxialPoly1
-    matrix = [0, 0, 0, 1; sn^3, sn^2, sn, 1; 0 ,0, 1, 0; 3*sn^2, 2*sn, 1, 0];
-    a = matrix \ [1;1.3;0;0];
+    matrix = [0 0 0 1; sn^3 sn^2 sn 1; 0 0 1 0; 3*sn^2 2*sn 1 0];
+    a = matrix \ [1; 1.3; 0; 0];
 
     # AxialPoly2
-    matrix2 = [sn^4, sn^3, sn^2, sn, 1 ;p2^4, p2^3, p2^2, p2, 1 ;4*sn^3, 3*sn^2, 2*sn, 1, 0 ;4*p2^3, 3*p2^2, 2*p2, 1, 0 ;12*p2^2, 6*p2, 2, 0, 0];
-    a2 = matrix2 \ [1.3;0;0;0;0];
+    matrix2 = [sn^4 sn^3 sn^2 sn 1; p2^4 p2^3 p2^2 p2 1; 4*sn^3 3*sn^2 2*sn 1 0; 4*p2^3 3*p2^2 2*p2 1 0; 12*p2^2 6*p2 2 0 0]
+    a2 = matrix2 \ [1.3; 0; 0; 0; 0];
     
     AoAcalc = AoA;
     

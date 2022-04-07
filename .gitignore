@@ -45,3 +45,5 @@ Guidance/output/
 Guidance/src/*.csv
 
 *.npy
+
+*/Manifest.toml

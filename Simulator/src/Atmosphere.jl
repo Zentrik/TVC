@@ -1,9 +1,9 @@
-struct atmosphere
-    gravity
-    
-    density
-    speedOfSound
-    kinematicViscocity
+using Parameters, Geophysics
 
-    wind
+@with_kw struct atmosphere @deftype Function
+    gravity = height -> [0; 0; -gravity(height)]
+    
+    density = Geophysics.density
+    speedOfSound = sonicspeed
+    kinematicViscocity = kinematic
 end
