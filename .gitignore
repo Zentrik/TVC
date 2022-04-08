@@ -47,3 +47,4 @@ Guidance/src/*.csv
 *.npy
 
 */Manifest.toml
+JuliaSysimage.dll
