@@ -230,61 +230,61 @@ end
 function set_bcs!(pbm::TrajectoryProblem)::Nothing
     # Boundary conditions
     
-    # if traj.MotorFired # If motor has been fired, coast time is 0
-    #     problem_set_bc!(
-    #         pbm, :ic, # Initial condition
-    #         (x, p, pbm) -> begin
-    #             veh = pbm.mdl.veh
-    #             traj = pbm.mdl.traj
+    if pbm.mdl.traj.MotorFired # If motor has been fired, coast time is 0
+        problem_set_bc!(
+            pbm, :ic, # Initial condition
+            (x, p, pbm) -> begin
+                veh = pbm.mdl.veh
+                traj = pbm.mdl.traj
 
-    #             x0 = zeros(pbm.nx)
-    #             x0[veh.id_r] .= traj.r0
-    #             x0[veh.id_v] .= traj.v0
-    #             x0[veh.id_quat] .= traj.q0
-    #             x0[veh.id_ω] = traj.ω0
-    #             x0[veh.id_T] = traj.T0
-    #             x0[veh.id_Ṫ] = traj.Ṫ0
+                x0 = zeros(pbm.nx)
+                x0[veh.id_r] .= traj.r0
+                x0[veh.id_v] .= traj.v0
+                x0[veh.id_quat] .= traj.q0
+                x0[veh.id_ω] = traj.ω0
+                x0[veh.id_T] = traj.T0
+                x0[veh.id_Ṫ] = traj.Ṫ0
 
-    #             return x - x0
-    #         end,
-    #         (x, p, pbm) -> I(pbm.nx), # Jacobian wrt x
-    #         (x, p, pbm) -> zeros(pbm.nx, pbm.np) # Jacobian wrt p
-    #     )
-    # else
-    problem_set_bc!(
-        pbm, :ic, # Initial condition
-        (x, p, pbm) -> begin
-            veh = pbm.mdl.veh
-            traj = pbm.mdl.traj
-            atmos = pbm.mdl.atmos
+                return x - x0
+            end,
+            (x, p, pbm) -> I(pbm.nx), # Jacobian wrt x
+            (x, p, pbm) -> zeros(pbm.nx, pbm.np) # Jacobian wrt p
+        )
+    else
+        problem_set_bc!(
+            pbm, :ic, # Initial condition
+            (x, p, pbm) -> begin
+                veh = pbm.mdl.veh
+                traj = pbm.mdl.traj
+                atmos = pbm.mdl.atmos
 
-            x0 = zeros(pbm.nx)
-            x0[veh.id_r] .= traj.r0 + traj.v0 * p[veh.id_tcoast] + atmos.g(traj.r0[3]) * p[veh.id_tcoast]^2/2
-            x0[veh.id_v] .= traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
-            x0[veh.id_quat] .= traj.q0
-            x0[veh.id_ω] = traj.ω0
-            x0[veh.id_T] = traj.T0
-            x0[veh.id_Ṫ] = traj.Ṫ0
+                x0 = zeros(pbm.nx)
+                x0[veh.id_r] = traj.r0 + traj.v0 * p[veh.id_tcoast] + atmos.g(traj.r0[3]) * p[veh.id_tcoast]^2/2
+                x0[veh.id_v] = traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
+                x0[veh.id_quat] = traj.q0
+                x0[veh.id_ω] = traj.ω0
+                x0[veh.id_T] = traj.T0
+                x0[veh.id_Ṫ] = traj.Ṫ0
 
-            return x - x0
-        end,
-        (x, p, pbm) -> I(pbm.nx), # Jacobian wrt x
-        (x, p, pbm) -> begin # Jacobian wrt p 
-            veh = pbm.mdl.veh
-            traj = pbm.mdl.traj
-            atmos = pbm.mdl.atmos
+                return x - x0
+            end,
+            (x, p, pbm) -> I(pbm.nx), # Jacobian wrt x
+            (x, p, pbm) -> begin # Jacobian wrt p 
+                veh = pbm.mdl.veh
+                traj = pbm.mdl.traj
+                atmos = pbm.mdl.atmos
 
-            J = zeros(pbm.nx, pbm.np)
-            J[veh.id_r, veh.id_tcoast] = traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
-            J[veh.id_v, veh.id_tcoast] = atmos.g(traj.r0[3])
-            J[veh.id_ω, veh.id_tcoast] = zeros(3)
-            J[veh.id_T, veh.id_tcoast] = zeros(3)
-            J[veh.id_Ṫ, veh.id_tcoast] = zeros(3)
+                J = zeros(pbm.nx, pbm.np)
+                J[veh.id_r, veh.id_tcoast] = traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
+                J[veh.id_v, veh.id_tcoast] = atmos.g(traj.r0[3])
+                J[veh.id_ω, veh.id_tcoast] = zeros(3)
+                J[veh.id_T, veh.id_tcoast] = zeros(3)
+                J[veh.id_Ṫ, veh.id_tcoast] = zeros(3)
 
-            return -J
-        end,
-    )
-    # end
+                return -J
+            end,
+        )
+    end
 
     problem_set_bc!(
             pbm, :tc, # Terminal condition
@@ -294,9 +294,9 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
 
                 xf = zeros(9)
                 xf[1] = traj.rN[3]
-                xf[2:3] .= traj.qN[2:3]
-                xf[4:6] .= traj.ωN
-                xf[7:9] .= traj.TN
+                xf[2:3] = traj.qN[2:3]
+                xf[4:6] = traj.ωN
+                xf[7:9] = traj.TN
 
                 return x[vcat(veh.id_r[3], veh.id_quat[2:3], veh.id_ω, veh.id_T)] - xf
             end,
@@ -329,19 +329,19 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                 - height
                 end)
 
-            if traj.MotorFired
-                @add_constraint(
-                    ocp, ZERO, "t_coast == 0", (p[veh.id_tcoast],), begin
-                        local t_coast = arg[1]
-                        t_coast
-                    end)
-            else
+            # if traj.MotorFired
+            #     @add_constraint(
+            #         ocp, ZERO, "t_coast == 0", (p[veh.id_tcoast],), begin
+            #             local t_coast = arg[1]
+            #             t_coast
+            #         end)
+            # else
                 @add_constraint(
                     ocp, NONPOS, "t_coast >= expected ignition time", (p[veh.id_tcoast],), begin
                         local t_coast = arg[1]
-                        (0.7 - 0.419) - t_coast # varies from 0.605 - 0.419 to 0.8 - 0.419
+                        traj.ExpectedIgnitionTime - t_coast
                     end)
-            end
+            # end
 
             @add_constraint(
                 ocp, SOC, "Thrust Magnitude <= Max", (x[veh.id_T],), begin # we have say thrust <= 1, as we want it normalised

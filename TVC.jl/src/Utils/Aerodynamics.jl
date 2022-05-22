@@ -1,31 +1,49 @@
 using LinearAlgebra
 using ..Utils
 
-export CalculateAero!
+export CalculateAero
 
-function CalculateAero!(Forces, Moments, rocket, atmos, wind, v, quat, ω, height, t)
+function CalculateAero(x, p, t)
+    veh = p.veh
+    atmos = p.atmos
+    wind = p.wind
+
+    r = x[veh.id_r]
+    height = r[3]
+    v = x[veh.id_v]
+    quat = x[veh.id_quat]
+    ω = x[veh.id_ω]
+    
     Airspeed = rotate(conjugate(quat), v + wind)
-    DynamicPressure = atmos.density(height) * norm(Airspeed)^2 / 2
-    AoA = acos(Airspeed[3] / norm(Airspeed))
-    Mach = norm(Airspeed) / atmos.speedOfSound(height)
 
     lengtha = norm(Airspeed[1:2])
-    
-    cosa = Airspeed[1] / lengtha;
-    sina = Airspeed[2] / lengtha;
 
-    ThetaRotation = [cosa -sina 0; sina cosa 0; 0 0 1]
-
-    ω_local = ThetaRotation \ ω # ω in wind coordinates?
-
-    (CN, Cpitch) = PitchNormalCD(rocket, Mach, AoA, ω_local[2], Airspeed, t)
-    Caxial = CalculateCD(rocket, atmos, Mach, AoA, Airspeed, height)
-    Cyaw = 0
-    Croll = 0
-    Cside = 0
+    if lengtha ≈ 0 
+        AeroForce = zeros(3)
+        AeroTorque = zeros(3)
+    else
+        DynamicPressure = atmos.density(height) * norm(Airspeed)^2 / 2
+        AoA = acos(Airspeed[3] / norm(Airspeed))
+        Mach = norm(Airspeed) / atmos.speedOfSound(height)
         
-    Forces += ThetaRotation * DynamicPressure * rocket.Reference_Area * -[CN; Cside; Caxial] # convert aero forces in wind frame to body frame?
-    Moments += ThetaRotation * (DynamicPressure * rocket.Reference_Area * rocket.Reference_Diameter * [-Cyaw; Cpitch; Croll])
+        cosa = Airspeed[1] / lengtha;
+        sina = Airspeed[2] / lengtha;
+
+        ThetaRotation = [cosa -sina 0; sina cosa 0; 0 0 1]
+
+        ω_local = ThetaRotation \ ω # ω in wind coordinates?
+
+        (CN, Cpitch) = PitchNormalCD(veh, Mach, AoA, ω_local[2], Airspeed, t)
+        Caxial = CalculateCD(veh, atmos, Mach, AoA, Airspeed, height)
+        Cyaw = 0
+        Croll = 0
+        Cside = 0
+            
+        AeroForce = ThetaRotation * DynamicPressure * veh.Reference_Area * -[CN; Cside; Caxial] # convert aero forces in wind frame to body frame?
+        AeroTorque = ThetaRotation * (DynamicPressure * veh.Reference_Area * veh.Reference_Diameter * [-Cyaw; Cpitch; Croll])
+    end
+
+    return (force=AeroForce, torque=AeroTorque)
 end
 
 function PitchNormalCD(rocket, Mach, AoA, pitchrate, Airspeed, t)

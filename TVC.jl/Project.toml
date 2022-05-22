@@ -4,9 +4,11 @@ authors = ["Zentrik <Zentrik@users.noreply.github.com>"]
 version = "0.1.0"
 
 [deps]
+ControlSystems = "a6e380b2-a6ca-5380-bf3e-84a91bcd477e"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 ECOS = "e2685f51-7e38-5353-a97d-a921fd2c8199"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Geophysics = "74efdf00-b554-44e1-bd21-abb9281d951c"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

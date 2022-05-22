@@ -8,12 +8,12 @@ Mb = sym('Moment', [3 1]);
 
 qdot = .5 * quatmultiply(q.', [0;w].').';
 
-devative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4); q(2:4)]; % devative of x
+derivative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4); q(2:4)]; % derivative of x
 x = [w; q(2:4); qi];
 u = Mb;
 
-A = jacobian(devative_vector, x);
-B = jacobian(devative_vector, u);
+A = jacobian(derivative_vector, x);
+B = jacobian(derivative_vector, u);
 C = eye(size(A,1));
 D = zeros(size(B));
 
@@ -111,15 +111,15 @@ g = [0; 0; -9.80655];
 Thrustxy = [0 1; -1 0] * Mb(1:2) / r(3);
 Thrustz = sqrt(Thrust^2 - norm(Thrustxy)^2);
 
-Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the devative_vector
+Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the derivative_vector
 qdot = .5 * quatmultiply(q.', [0;w].').';
 
-devative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz(1:2)]; % devative of x
+derivative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz(1:2)]; % derivative of x
 x = [w; q(2:4); Ve];
 u = Mb;
 
-A = jacobian(devative_vector, x);
-B = jacobian(devative_vector, u);
+A = jacobian(derivative_vector, x);
+B = jacobian(derivative_vector, u);
 C = eye(size(A,1));
 D = zeros(size(B));
 
@@ -204,15 +204,18 @@ g = [0; 0; -9.80655];
 Thrustxy = [0 1; -1 0] * Mb(1:2) / r(3);
 Thrustz = sqrt(Thrust^2 - norm(Thrustxy)^2);
 
-Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the devative_vector
+Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the derivative_vector
 qdot = .5 * quatmultiply(q.', [0;w].').';
 
-devative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz(1:2); Ve]; % devative of x
+derivative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz(1:2); Ve]; % derivative of x
 x = [w; q(2:4); Ve; Xe];
 u = Mb;
 
-A = jacobian(devative_vector, x);
-B = jacobian(devative_vector, u);
+% derivative_vector = [Ve; Aexyz(1:2); qdot(2:4); I \ (Mb - cross(w,I*w))]; % derivative of x
+% x = [Xe; Ve; q(2:4); w];
+
+A = jacobian(derivative_vector, x);
+B = jacobian(derivative_vector, u);
 C = eye(size(A,1));
 D = zeros(size(B));
 
@@ -223,6 +226,7 @@ A = subs(A, I, Inertia);
 A = subs(A, w, omega);
 A = subs(A, q, [1; 0; 0; 0]);
 A = subs(A, Thrust, 10.6);
+% A = subs(A, Thrust, 15.589230769230769);
 A = subs(A, Mb, [0; 0; 0]);
 
 B = subs(B, I, Inertia);
@@ -297,15 +301,15 @@ g = [0; 0; -9.80655];
 Thrustxy = [0 1; -1 0] * Mb(1:2) / r(3);
 Thrustz = sqrt(Thrust^2 - norm(Thrustxy)^2);
 
-Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the devative_vector
+Aexyz = g + q2dcm(q(1), -q(2), -q(3), -q(4)) * ([Thrustxy; Thrustz]) / mass; % has to be inverse quat, g doesn't actually affect the derivative_vector
 qdot = .5 * quatmultiply(q.', [0;w].').';
 
-devative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz; Ve]; % devative of x
+derivative_vector = [I \ (Mb - cross(w,I*w)); qdot(2:4) ; Aexyz; Ve]; % derivative of x
 x = [w; q(2:4); Ve; Xe];
 u = Mb;
 
-A = jacobian(devative_vector, x);
-B = jacobian(devative_vector, u);
+A = jacobian(derivative_vector, x);
+B = jacobian(derivative_vector, u);
 C = eye(size(A,1));
 D = zeros(size(B));
 
