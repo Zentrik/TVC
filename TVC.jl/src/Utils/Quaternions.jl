@@ -90,9 +90,7 @@ function slerp_quat(q0, q1, frac)
     Δq = quatL(conjugate(q0)) * q1 # quaternion rotating q0 to q1
     # Δq_t = wexp(frac * quatLog(Δq)[2:4])
     
-    # from quatLog.
-    axis = Δq[2:4] / norm(Δq[2:4])
-    angle = frac * atan(norm(Δq[2:4]), Δq[1]) / 2
+    axis, angle = quatLogAxisAngle(Δq)
 
     Δq_t = [cos(angle); sin(angle) * axis]
     qt = quatL(q0) * Δq_t
@@ -100,8 +98,23 @@ function slerp_quat(q0, q1, frac)
     return qt
 end
 
+function quatLogAxisAngle(quat)
+    if norm(quat[2:4]) ≈ 0
+        axis = [0; 0; 1]
+    else
+        axis = quat[2:4] / norm(quat[2:4])
+    end
+    angle = atan(norm(quat[2:4]), quat[1])
+
+    return axis, angle
+end
+
 function quatLog(quat)
-    axis = quat[2:4] / norm(quat[2:4])
+    if norm(quat[2:4]) ≈ 0
+        axis = [0; 0; 1]
+    else
+        axis = quat[2:4] / norm(quat[2:4])
+    end
     angle = atan(norm(quat[2:4]), quat[1])
 
     return [log(norm(quat)); axis * angle]

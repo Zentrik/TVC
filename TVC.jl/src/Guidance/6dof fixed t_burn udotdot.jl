@@ -3,7 +3,7 @@
 using SCPToolbox
 
 using LinearAlgebra
-using ECOS
+# using ECOS
 
 using ..Utils
 import ..Utils: rotate, skew
@@ -73,43 +73,98 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     return nothing
 end
 
+function straightline_interpolate(v0, vf, N::Int)
+
+    # Initialize
+    nv = length(v0)
+    v = zeros(nv, N)
+
+    for k = 1:N
+        mix = (k - 1) / (N - 1)
+
+        v[:, k] = v0 + mix * (vf - v0)
+    end
+
+    return v
+end
+
 function set_guess!(pbm::TrajectoryProblem)::Nothing
     problem_set_guess!(pbm, (N, pbm) -> begin
         veh = pbm.mdl.veh
         traj = pbm.mdl.traj
         atmos = pbm.mdl.atmos
 
-        dt = veh.BurnTime / (N - 1) # for convex constraints
+        p = [0.0] # ignite immediately.
 
-        t_coast = 0.0
-        t_burn = veh.BurnTime - traj.t0
+        # motorTimeRemaining = veh.BurnTime - traj.t0 # how much motor time remaining
 
-        x0 = zeros(pbm.nx)
-        x0[veh.id_r] .= traj.r0 + traj.v0 * t_coast + atmos.g(traj.r0[3]) * t_coast^2/2
-        x0[veh.id_v] .= traj.v0 + atmos.g(traj.r0[3]) * t_coast
-        x0[veh.id_quat] .= traj.q0
-        x0[veh.id_ω] = traj.ω0
-        x0[veh.id_T] = traj.T0
-        x0[veh.id_Ṫ] = traj.Ṫ0
-
-        xf = [traj.rN; traj.vN; traj.qN; traj.ωN; traj.TN; traj.ṪN][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω; veh.id_T; veh.id_Ṫ]];
+        # dt = motorTimeRemaining / (N - 1) # for convex constraints
 
         x = zeros(pbm.nx, N)
         u = zeros(pbm.nu, N)
-        
-        p = [t_coast]
 
+        x[veh.id_r, :] = straightline_interpolate(traj.r0, traj.rN, N)
+        x[veh.id_v, :] = straightline_interpolate(traj.v0, traj.vN, N)
+        x[veh.id_ω, :] = straightline_interpolate(traj.ω0, traj.ωN, N)
+
+        x[veh.id_T, :] = straightline_interpolate(traj.T0, traj.TN, N)  
+        x[veh.id_Ṫ, :] = straightline_interpolate(traj.Ṫ0, traj.ṪN, N) 
+        
+        u = straightline_interpolate([0; 0; 0; 0], [0; 0; 0; 0], N)
+        
         for k = 1:N
-            t = (k - 1) / (N - 1) * t_burn
-            x[:, k] = (t_burn - t) / t_burn * x0 + t / t_burn * xf
-            u[:, k] = [0; 0; 0; 0]
+            mix = (k - 1) / (N - 1)
+            
+            x[veh.id_quat, k] = slerp_quat(traj.q0, traj.qN, mix)
         end
 
-        return x, u, p 
+        return x, u, p
     end)
 
     return nothing
 end
+
+# function set_guess!(pbm::TrajectoryProblem)::Nothing
+#     problem_set_guess!(pbm, (N, pbm) -> begin
+#         veh = pbm.mdl.veh
+#         traj = pbm.mdl.traj
+#         atmos = pbm.mdl.atmos
+
+#         dt = veh.BurnTime / (N - 1) # for convex constraints
+
+#         t_coast = 0.0
+#         t_burn = veh.BurnTime - traj.t0
+
+#         x0 = zeros(pbm.nx)
+#         x0[veh.id_r] .= traj.r0 + traj.v0 * t_coast + atmos.g(traj.r0[3]) * t_coast^2/2
+#         x0[veh.id_v] .= traj.v0 + atmos.g(traj.r0[3]) * t_coast
+#         x0[veh.id_quat] .= traj.q0
+#         x0[veh.id_ω] = traj.ω0
+#         x0[veh.id_T] = traj.T0
+#         x0[veh.id_Ṫ] = traj.Ṫ0
+
+#         xf = [traj.rN; traj.vN; traj.qN; traj.ωN; traj.TN; traj.ṪN][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω; veh.id_T; veh.id_Ṫ]];
+
+#         x = zeros(pbm.nx, N)
+#         u = zeros(pbm.nu, N)
+        
+#         p = [t_coast]
+
+#         for k = 1:N
+#             t = (k - 1) / (N - 1) * t_burn
+
+#             x[:, k] = (t_burn - t) / t_burn * x0 + t / t_burn * xf
+#             mix = (k - 1) / (N - 1)
+#             x[veh.id_quat, k] = slerp_quat(x0[veh.id_quat], xf[veh.id_quat], mix)
+
+#             u[:, k] = [0; 0; 0; 0]
+#         end
+
+#         return x, u, p 
+#     end)
+
+#     return nothing
+# end
     
 function set_cost!(pbm::TrajectoryProblem)::Nothing
     problem_set_terminal_cost!(
@@ -202,13 +257,13 @@ function set_dynamics!(pbm::TrajectoryProblem)::Nothing
     problem_set_dynamics!(
         pbm,
         # f
-        (t, k, x, u, p, pbm) -> f_t(x, u, motorTime(t, pbm.mdl), pbm) * pbm.mdl.veh.BurnTime,
+        (t, k, x, u, p, pbm) -> f_t(x, u, motorTime(t, pbm.mdl), pbm) * (pbm.mdl.veh.BurnTime - pbm.mdl.traj.t0),
         # df/dx
-        (t, k, x, u, p, pbm) -> A_t(x, u, motorTime(t, pbm.mdl), pbm.mdl.veh) * pbm.mdl.veh.BurnTime,
+        (t, k, x, u, p, pbm) -> A_t(x, u, motorTime(t, pbm.mdl), pbm.mdl.veh) * (pbm.mdl.veh.BurnTime - pbm.mdl.traj.t0),
         # df/du
-        (t, k, x, u, p, pbm) -> B_t(x, u, motorTime(t, pbm.mdl), pbm.mdl.veh) * pbm.mdl.veh.BurnTime,
+        (t, k, x, u, p, pbm) -> B_t(x, u, motorTime(t, pbm.mdl), pbm.mdl.veh) * (pbm.mdl.veh.BurnTime  - pbm.mdl.traj.t0),
         # df/dp
-        (t, k, x, u, p, pbm) -> zeros(pbm.nx, pbm.np) * pbm.mdl.veh.BurnTime
+        (t, k, x, u, p, pbm) -> zeros(pbm.nx, pbm.np) * (pbm.mdl.veh.BurnTime  - pbm.mdl.traj.t0)
     )
 
     return nothing
@@ -230,7 +285,7 @@ end
 function set_bcs!(pbm::TrajectoryProblem)::Nothing
     # Boundary conditions
     
-    if pbm.mdl.traj.MotorFired # If motor has been fired, coast time is 0
+    if false #pbm.mdl.traj.MotorFired # If motor has been fired, coast time is 0
         problem_set_bc!(
             pbm, :ic, # Initial condition
             (x, p, pbm) -> begin
@@ -259,7 +314,7 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
                 atmos = pbm.mdl.atmos
 
                 x0 = zeros(pbm.nx)
-                x0[veh.id_r] = traj.r0 + traj.v0 * p[veh.id_tcoast] + atmos.g(traj.r0[3]) * p[veh.id_tcoast]^2/2
+                x0[veh.id_r] = traj.r0 + traj.v0 * p[veh.id_tcoast] + atmos.g(traj.r0[3]) * p[veh.id_tcoast]^2/2 # is there a better approximation? can we just calculate the exact result. (rn g is constant, so its fine)
                 x0[veh.id_v] = traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
                 x0[veh.id_quat] = traj.q0
                 x0[veh.id_ω] = traj.ω0
@@ -329,19 +384,19 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                 - height
                 end)
 
-            # if traj.MotorFired
-            #     @add_constraint(
-            #         ocp, ZERO, "t_coast == 0", (p[veh.id_tcoast],), begin
-            #             local t_coast = arg[1]
-            #             t_coast
-            #         end)
-            # else
+            if traj.MotorFired
+                @add_constraint(
+                    ocp, ZERO, "t_coast == 0", (p[veh.id_tcoast],), begin
+                        local t_coast = arg[1]
+                        t_coast
+                    end)
+            else
                 @add_constraint(
                     ocp, NONPOS, "t_coast >= expected ignition time", (p[veh.id_tcoast],), begin
                         local t_coast = arg[1]
                         traj.ExpectedIgnitionTime - t_coast
                     end)
-            # end
+            end
 
             @add_constraint(
                 ocp, SOC, "Thrust Magnitude <= Max", (x[veh.id_T],), begin # we have say thrust <= 1, as we want it normalised

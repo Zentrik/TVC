@@ -1,6 +1,5 @@
 using Parameters, LinearAlgebra, StaticArrays
 using ..Utils
-# include("Rocket_Acceleration.jl")
 
 export RocketParameters
 

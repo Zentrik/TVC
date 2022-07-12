@@ -10,7 +10,7 @@ traj = RocketTrajectoryParameters();
 mdl = RocketProblem(veh, atmos, traj)
 
 servoΔt = 0.02 # Servo step rate
-x₀ = [[0; 0; 0]; [0; 0; 0]; [1; 0; 0; 0]; [0; 1; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
+x₀ = [[0; 0; 15.]; [0; 0; 0]; [1; 0; 0; 0]; [0; 0; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
 
 #   Specify Controller
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -24,7 +24,7 @@ function control(x, p, t)
 
     desired_torque = -.5 * x[veh.id_quat[2:4]] - .5 * x[veh.id_ω] # PD controller, not well tuned.
 
-    return desired_torque
+    return zeros(3)
 end
 
 #   Continuous Actuator Model
@@ -62,7 +62,7 @@ end
 #   ≡≡≡≡≡≡≡≡≡≡≡
 
 tspan = (0, veh.BurnTime)
-p = (veh=veh, atmos=atmos, Aero=true, wind=zeros(3), MotorIgnitionTime=0., Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
+p = (veh=veh, atmos=atmos, Aero=false, wind=zeros(3), MotorIgnitionTime=0., Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
 
 prob = ODEProblem(f!, x₀, tspan, p)
 
@@ -71,8 +71,8 @@ cb = ContinuousCallback(condition, nothing, terminate!) # when going upwards do 
 
 sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
 
-# plot(sol, vars=veh.id_r)
-plot(sol, vars=veh.id_quat)
+plot(sol, vars=veh.id_r)
+# plot(sol, vars=veh.id_quat)
 # plot(sol, vars=veh.id_ω)
 
 # deviationAngle = map(q -> acosd(TVC.Utils.rotate(q, [0; 0; 1]) ⋅ [0; 0; 1]), eachcol(sol[veh.id_quat, :]))

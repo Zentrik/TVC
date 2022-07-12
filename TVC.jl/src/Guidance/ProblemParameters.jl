@@ -14,7 +14,7 @@ export RocketTrajectoryParameters, RocketProblem
     T0 = @SVector Float64[0; 0; 1] # Initial Thrust Vector
     Ṫ0 = @SVector zeros(3) # Initial Derivative of Thrust Vector
     # MotorFired::Base.RefValue{Bool} = Ref(false) # Has the motor been ignited yet, using ref value should allow mutability
-    t0::R = 0.0 # time since motor starts firing.
+    t0::R = 0.0 # time since motor started firing (if MotorFired is true).
     MotorFired::Bool = false
     ExpectedIgnitionTime::R = 0. #(0.7 - 0.419), # varies from 0.605 - 0.419 to 0.8 - 0.419
 
