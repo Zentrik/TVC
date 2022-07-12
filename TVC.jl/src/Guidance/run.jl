@@ -29,7 +29,7 @@
 #     return sol
 # end
 
-export solveProblem, solveProblem_no_coast
+export solveProblem
 
 using ECOS
 
@@ -60,32 +60,4 @@ end
 
 function solveProblem(mdl = RocketProblem())
     return ptr(mdl)
-end
-
-function ptr_no_coast(mdl)
-    # Problem definition
-    pbm = TrajectoryProblem(mdl)
-    define_problem_no_coast!(pbm)
-
-    N, Nsub = floor(Int, (mdl.veh.BurnTime - mdl.traj.t0) / 0.2) + 1, 15 # dt can be set to 0.2 or even higher with little decrease in cost (velocity will only be a bit higher).
-    iter_max = 100
-    disc_method = FOH
-    wvc, wtr = 1e7, 1e-1 # wtr is important, needs to be small but too small and we get problems. 
-    feas_tol = 1e-1
-    ε_abs, ε_rel = 1e-5, 1e-3
-    q_tr = Inf
-    q_exit = Inf
-    solver, options = ECOS, Dict("verbose"=>0, "maxit" => 1000)
-    pars = PTR.Parameters(
-        N, Nsub, iter_max, disc_method, wvc, wtr, ε_abs,
-        ε_rel, feas_tol, q_tr, q_exit, solver, options)
-
-    # Create and solve the problem
-    ptr_pbm = PTR.create(pars, pbm)
-    sol, history = PTR.solve(ptr_pbm)
-    return sol
-end
-
-function solveProblem_no_coast(mdl = RocketProblem())
-    return ptr_no_coast(mdl)
 end

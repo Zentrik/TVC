@@ -10,22 +10,12 @@ traj = RocketTrajectoryParameters();
 mdl = RocketProblem(veh, atmos, traj)
 
 servoΔt = 0.02 # Servo step rate
-x₀ = [[0; 0; 15.]; [0; 0; 0]; [1; 0; 0; 0]; [0; 0; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
+x₀ = [[0; 0; 0]; [0; 0; 0]; [1; 0; 0; 0]; [0; 1; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
 
-#   Specify Controller
-#   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+#   LQR Controller
+#   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
-#   PID Controller
-#   ================
-
-function control(x, p, t)
-    veh = p.veh
-    tₘ = motorTime(t, p.MotorIgnitionTime)
-
-    desired_torque = -.5 * x[veh.id_quat[2:4]] - .5 * x[veh.id_ω] # PD controller, not well tuned.
-
-    return zeros(3)
-end
+using ForwardDiff
 
 #   Continuous Actuator Model
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -58,11 +48,52 @@ function Actuator(x, p, t, desired_torque) # Model of TVC
     return (force=Thrust, torque=torque)
 end
 
+#   Specify Linearisation Points
+#   ––––––––––––––––––––––––––––––
+
+x̄ = [[0; 0; 10]; [0; 0; 0]; [1; 0; 0; 0]; [0; 0; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]]; # if touching ground, the forces and torques will be 0
+ū = zeros(3)
+t̄ = 1. # gives roughly mean thrust.
+
+indices = [veh.id_r[1:2]; veh.id_v[1:2]; veh.id_quat[2:4]; veh.id_ω] # states for LQR
+
+p̄(u) = (veh=veh, atmos=atmos, Aero=false, wind=zeros(3), MotorIgnitionTime=0., Control=(x, p, t) -> Actuator(x, p, t, u));
+
+A = ForwardDiff.jacobian((dx, x) -> f!(dx, x, p̄(ū), t̄), zeros(13), x̄)
+B = ForwardDiff.jacobian((dx, u) -> f!(dx, x̄, p̄(u), t̄), zeros(13), ū)
+
+A = A[indices, indices] # janky way to ignore z component of r, v and real component of quat.
+B = B[indices, :]
+
+using ControlSystems
+
+Q = Diagonal([1,1,1, 2,2,2, 1,1, 1,1])
+R = Diagonal([0.3, 0.3, 0.47])
+K = lqr(Continuous, A, B, Q, R)
+
+function control(x, p, t)
+    return - K * x[indices]
+end
+
 #   Solve ODE
 #   ≡≡≡≡≡≡≡≡≡≡≡
 
+using Parameters
+
+@with_kw struct ODEParameters{R, V}
+    veh::RocketParameters = RocketParameters()
+    atmos::Atmosphere = Atmosphere()
+    traj::RocketTrajectoryParameters = RocketTrajectoryParameters()
+
+    Aero::Bool = true
+    wind::V = zeros(3)
+
+    MotorIgnitionTime::R = 0.0
+    Control = zeros(3)
+end
+
 tspan = (0, veh.BurnTime)
-p = (veh=veh, atmos=atmos, Aero=false, wind=zeros(3), MotorIgnitionTime=0., Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
+p = ODEParameters(veh=veh, atmos=atmos, Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
 
 prob = ODEProblem(f!, x₀, tspan, p)
 
@@ -71,8 +102,8 @@ cb = ContinuousCallback(condition, nothing, terminate!) # when going upwards do 
 
 sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
 
-plot(sol, vars=veh.id_r)
-# plot(sol, vars=veh.id_quat)
+# plot(sol, vars=veh.id_r)
+plot(sol, vars=veh.id_quat)
 # plot(sol, vars=veh.id_ω)
 
 # deviationAngle = map(q -> acosd(TVC.Utils.rotate(q, [0; 0; 1]) ⋅ [0; 0; 1]), eachcol(sol[veh.id_quat, :]))
