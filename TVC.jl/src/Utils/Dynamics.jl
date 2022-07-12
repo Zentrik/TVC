@@ -39,7 +39,7 @@ function f!(dx, x, p, t, control) # to allow for jacobian to be calculated wrt c
         Torque += Aero.torque
     end
 
-    if height <= 0 && Force[3] <= 0
+    if p.ground && height <= 0 && Force[3] <= 0
         Force = zeros(3)
         Torque = zeros(3)
     end
