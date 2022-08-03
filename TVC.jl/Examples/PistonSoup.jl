@@ -32,10 +32,7 @@ tspan = (0, veh.BurnTime)
 
 prob = ODEProblem(f!, x₀, tspan, p)
 
-condition(x,t,integrator) = x[3] # when height is zero halt integration
-cb = ContinuousCallback(condition, nothing, terminate!) # when going upwards do nothing
-
-sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
+sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8)
 
 println(sol.u[end][veh.id_r])
 println(TVC.Utils.to_matrix(sol.u[end][veh.id_quat]))
@@ -60,11 +57,12 @@ prob = ODEProblem(f!, x₀, tspan, p)
 condition(x,t,integrator) = x[3] # when height is zero halt integration
 cb = ContinuousCallback(condition, nothing, terminate!) # when going upwards do nothing
 
-sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
+sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8)
 
 println(sol.u[end][veh.id_r])
 println(TVC.Utils.to_matrix(sol.u[end][veh.id_quat]))
 println(sol.u[end][veh.id_ω])
+
 #   CASE 3
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
@@ -89,7 +87,7 @@ tspan = (0, veh.BurnTime)
 
 prob = ODEProblem(f!, x₀, tspan, p)
 
-sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
+sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8)
 
 println(sol.u[end][veh.id_r])
 println(TVC.Utils.to_matrix(sol.u[end][veh.id_quat]))

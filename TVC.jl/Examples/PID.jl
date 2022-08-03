@@ -1,4 +1,4 @@
-using TVC, DifferentialEquations, Plots, LinearAlgebra
+using TVC, DifferentialEquations, Plots, LinearAlgebra, Parameters
 
 #   Specify Parameters
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -9,8 +9,21 @@ traj = RocketTrajectoryParameters();
 
 mdl = RocketProblem(veh, atmos, traj)
 
-servoΔt = 0.02 # Servo step rate
-x₀ = [[0; 0; 0]; [0; 0; 0]; [1; 0; 0; 0]; [0; 1; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
+x₀ = [[0; 0; 0]; [0; 0; 0]; [1; 0; 0; 0]; [0; 0; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
+
+@with_kw struct ODEParameters{R, V}
+    veh::RocketParameters = RocketParameters()
+    atmos::Atmosphere = Atmosphere()
+    traj::RocketTrajectoryParameters = RocketTrajectoryParameters();
+
+    Aero::Bool = false
+    wind::V = zeros(3)
+
+    ground::Bool = true
+
+    MotorIgnitionTime::R = 0.0
+    Control = (x, p, t) -> (force=[0; 0; veh.Thrust(t)], torque=zeros(3))
+end
 
 #   Specify Controller
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -20,7 +33,7 @@ x₀ = [[0; 0; 0]; [0; 0; 0]; [1; 0; 0; 0]; [0; 1; 0]][[veh.id_r; veh.id_v; veh.
 
 function control(x, p, t)
     veh = p.veh
-    tₘ = motorTime(t, p.MotorIgnitionTime)
+    # tₘ = motorTime(t, p.MotorIgnitionTime)
 
     desired_torque = -.5 * x[veh.id_quat[2:4]] - .5 * x[veh.id_ω] # PD controller, not well tuned.
 
@@ -62,7 +75,9 @@ end
 #   ≡≡≡≡≡≡≡≡≡≡≡
 
 tspan = (0, veh.BurnTime)
-p = (veh=veh, atmos=atmos, Aero=true, wind=zeros(3), MotorIgnitionTime=0., Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
+
+wind = randn(3) * 2
+p = ODEParameters(veh=veh, atmos=atmos, Aero=true, wind=randn(3) * 2, Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
 
 prob = ODEProblem(f!, x₀, tspan, p)
 
@@ -72,9 +87,19 @@ cb = ContinuousCallback(condition, nothing, terminate!) # when going upwards do 
 sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
 
 # plot(sol, vars=veh.id_r)
-plot(sol, vars=veh.id_quat)
+# plot(sol, vars=veh.id_quat)
 # plot(sol, vars=veh.id_ω)
 
-# deviationAngle = map(q -> acosd(TVC.Utils.rotate(q, [0; 0; 1]) ⋅ [0; 0; 1]), eachcol(sol[veh.id_quat, :]))
+deviationAngle = map(q -> acosd(TVC.Utils.rotate(q, [0; 0; 1]) ⋅ [0; 0; 1]), eachcol(sol[veh.id_quat, :]))
 
-# plot(sol.t, deviationAngle)
+plot(sol.t, deviationAngle)
+
+plot(sol.t, deviationAngle, label="PID")
+
+# p = ODEParameters(veh=veh, atmos=atmos, Aero=true, wind=wind)
+
+# prob = ODEProblem(f!, x₀, tspan, p)
+
+# sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
+
+# plot!(sol.t, map(q -> acosd(TVC.Utils.rotate(q, [0; 0; 1]) ⋅ [0; 0; 1]), eachcol(sol[veh.id_quat, :])), label="No PID")
