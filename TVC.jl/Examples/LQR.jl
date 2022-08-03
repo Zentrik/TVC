@@ -1,36 +1,25 @@
-using TVC, DifferentialEquations, Plots, LinearAlgebra
+using TVC, DifferentialEquations, Plots, LinearAlgebra, Parameters, ForwardDiff
 
 #   Specify Parameters
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
 veh = RocketParameters()
 atmos = Atmosphere()
-traj = RocketTrajectoryParameters();
-
-mdl = RocketProblem(veh, atmos, traj)
 
 x₀ = [[0; 0; 0]; [0; 0; 0]; [1; 0; 0; 0]; [0; 0; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]];
-
-using Parameters
 
 @with_kw struct ODEParameters{R, V}
     veh::RocketParameters = RocketParameters()
     atmos::Atmosphere = Atmosphere()
-    traj::RocketTrajectoryParameters = RocketTrajectoryParameters();
 
     Aero::Bool = false
     wind::V = zeros(3)
 
     ground::Bool = true
 
-    MotorIgnitionTime::R = 0.0
+    MotorIgnitionTime::R = 0.0 # How long till motor ignites
     Control = (x, p, t) -> (force=[0; 0; veh.Thrust(t)], torque=zeros(3))
 end
-
-#   LQR Controller
-#   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
-
-using ForwardDiff
 
 #   Continuous Actuator Model
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -63,16 +52,19 @@ function Actuator(x, p, t, desired_torque) # Model of TVC
     return (force=Thrust, torque=torque)
 end
 
+#   LQR Controller
+#   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
 #   Specify Linearisation Points
 #   ––––––––––––––––––––––––––––––
 
-x̄ = [[0; 0; 10]; [0; 0; 0]; [1; 0; 0; 0]; [0; 0; 0]][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω]]; # if touching ground, the forces and torques will be 0
+x̄ = x₀
 ū = zeros(3)
 t̄ = 1. # gives roughly mean thrust.
 
 LQRindices = [veh.id_r[1:2]; veh.id_v[1:2]; veh.id_quat[2:4]; veh.id_ω] # states for LQR
 
-p̄(u) = (veh=veh, atmos=atmos, traj=RocketTrajectoryParameters(), Aero=false, wind=zeros(3), ground=false, MotorIgnitionTime=0., Control=(x, p, t) -> Actuator(x, p, t, u)); # ground false to avoid the discontinuity.
+p̄(u) = (veh=veh, atmos=atmos, traj=RocketTrajectoryParameters(), Aero=false, wind=zeros(3), ground=false, MotorIgnitionTime=0.0, Control=(x, p, t) -> Actuator(x, p, t, u)); # ground false to avoid the discontinuity, if touching ground, the forces and torques will be 0.
 
 A = ForwardDiff.jacobian((dx, x) -> f!(dx, x, p̄(ū), t̄), zeros(13), x̄)
 B = ForwardDiff.jacobian((dx, u) -> f!(dx, x̄, p̄(u), t̄), zeros(13), ū)
@@ -93,7 +85,7 @@ end
 #   Solve ODE
 #   ≡≡≡≡≡≡≡≡≡≡≡
 
-tspan = (0, veh.BurnTime)
+tspan = (p.MotorIgnitionTime, p.MotorIgnitionTime + veh.BurnTime)
 
 wind = randn(3) * 2
 p = ODEParameters(veh=veh, atmos=atmos, Aero=true, wind=wind, Control=(x, p, t) -> Actuator(x, p, t, control(x, p, t)))
@@ -103,7 +95,7 @@ prob = ODEProblem(f!, x₀, tspan, p)
 condition(x,t,integrator) = x[3] # when height is zero halt integration
 cb = ContinuousCallback(condition, nothing, terminate!) # when going upwards do nothing
 
-sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cb)
+sol = DifferentialEquations.solve(prob, callback=cb)
 
 # plot(sol, vars=veh.id_r)
 # plot(sol, vars=veh.id_quat)
