@@ -31,7 +31,7 @@ Other videos by brian, brunton, 3b1b etc.
 [Satellite Dynamics and Control in a Quaternion
 Formulation](https://orbit.dtu.dk/files/98594729/Satdyn_mb_2010f.pdf)
 
-[Great introduction to control theory](controls-in-frc.link)
+[Great introduction to control theory](https://controls-in-frc.link)
 
 [Basic tutorials in control theory](https://ctms.engin.umich.edu/CTMS/index.php?aux=Home)
 
