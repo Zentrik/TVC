@@ -48,3 +48,5 @@ Guidance/src/*.csv
 
 */Manifest.toml
 JuliaSysimage.dll
+
+.vscode
