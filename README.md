@@ -1,4 +1,4 @@
-See [LQR example](TVC.jl/Examples/LQR.jl) or [PID example](TVC.jl/Examples/PID.jl)
+After running `] activate TVC.jl` in a Julia repl in the TVC directory, see [LQR example](TVC.jl/Examples/LQR.jl) or [PID example](TVC.jl/Examples/PID.jl).
 
 Guidance for pinpoint landing is [old files](Guidance/README.md)/[6dof only](TVC.jl/src/Guidance).
 
