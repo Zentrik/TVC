@@ -53,7 +53,7 @@ A_bb is the derivative of V_b wrt to the body reference frame whilst A_be is wrt
 
 [OpenRocket](https://github.com/openrocket/openrocket/releases/download/Development_of_an_Open_Source_model_rocket_simulation-thesis-v20090520/Development_of_an_Open_Source_model_rocket_simulation-thesis-v20090520.pdf) describes the aerodynamic forces acting on a model rocket. 
 I don't know if I would recommend trying to implement the equation from here, I struggled quite a lot doing that but using debugging tools on the OpenRocket code helped.
-It would probably be best to look at other implementations of the barrowman equations/ find the deleted code in this repo where I had it implemented for a rocket with a conical nose cone and no fins.
+It would probably be best to look at other implementations of the barrowman equations/ [Aerodynamics.jl](TVC.jl/src/Utils/Aerodynamics.jl) where its implemented for a rocket with a conical nose cone and no fins.
 
 ## Optimal Landing
 
