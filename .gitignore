@@ -18,6 +18,9 @@ Paper/*
 !Paper/*.bib
 !Paper/Images
 !Paper/svg-inkscape
+*.ist
+*.dpth
+*.md5
 
 *.tmp
 # Word temporary
