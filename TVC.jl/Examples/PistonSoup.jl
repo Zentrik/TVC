@@ -1,6 +1,4 @@
-using TVC, DifferentialEquations, Plots, LinearAlgebra
-
-using Parameters
+using TVC, DifferentialEquations, Plots, LinearAlgebra, Parameters
 
 @with_kw struct ODEParameters{R, V}
     veh::RocketParameters = RocketParameters()
