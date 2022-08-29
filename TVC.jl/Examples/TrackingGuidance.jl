@@ -98,7 +98,7 @@ using Parameters
     solution::S
 
     MotorIgnitionTime::R = 0.0
-    Control = zeros(3)
+    Control = (x, p, t) -> (force=[0; 0; veh.Thrust(t)], torque=zeros(3))
 end
 
 MotorIgnitionTime = solution.p[veh.id_tcoast]
@@ -126,6 +126,9 @@ p = ODEParameters(veh=veh, atmos=atmos, traj=traj, solution=solution, MotorIgnit
 #   =====================
 
 # p = ODEParameters(veh=veh, atmos=atmos, traj=traj, solution=solution, MotorIgnitionTime=MotorIgnitionTime, Control=(x, p, t) -> control(x, p, t, servoΔt))
+
+# discretecb = PeriodicCallback((integrator) -> nothing, servoΔt);
+# cbs = CallbackSet(cb, discretecb)
 
 prob = ODEProblem(f!, x0, tspan, p)
 
