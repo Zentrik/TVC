@@ -9,6 +9,8 @@ using ..Utils
 import ..Utils: rotate, skew
 using ..Guidance
 
+using ForwardDiff
+
 export define_problem!
 
 # Per Successive Convexification for Mars 6-DoF Powered Descent Landing Guidance, 2017. Set control to second derivative of thrust vector
@@ -316,10 +318,14 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
                 x0 = zeros(pbm.nx)
                 x0[veh.id_r] = traj.r0 + traj.v0 * p[veh.id_tcoast] + atmos.g(traj.r0[3]) * p[veh.id_tcoast]^2/2 # is there a better approximation? can we just calculate the exact result. (rn g is constant, so its fine)
                 x0[veh.id_v] = traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
-                x0[veh.id_quat] = traj.q0
-                x0[veh.id_ω] = traj.ω0
-                x0[veh.id_T] = traj.T0
-                x0[veh.id_Ṫ] = traj.Ṫ0
+                x0[veh.id_quat] = quatL(traj.q0) * wexp(traj.ω0 * p[veh.id_tcoast])
+                x0[veh.id_ω] = traj.ω0 # not true is it?
+                x0[veh.id_T] = traj.T0 + traj.Ṫ0 * p[veh.id_tcoast] # this should be fine
+                x0[veh.id_Ṫ] = traj.Ṫ0 # this should be true
+
+                if  p[veh.id_tcoast] > 1e-3 && norm(veh.InertiaTensor \ (- cross(traj.ω0, veh.InertiaTensor * traj.ω0))) > 1e-5 #abs(traj.ω0[3]) > 1e-4
+                    println("Warning: Initial constraint probably false, angular acceleration in free fall is non zero") 
+                end
 
                 return x - x0
             end,
@@ -332,9 +338,16 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
                 J = zeros(pbm.nx, pbm.np)
                 J[veh.id_r, veh.id_tcoast] = traj.v0 + atmos.g(traj.r0[3]) * p[veh.id_tcoast]
                 J[veh.id_v, veh.id_tcoast] = atmos.g(traj.r0[3])
+                J[veh.id_quat, veh.id_tcoast] = ForwardDiff.derivative(t -> quatL(traj.q0) * wexp(traj.ω0 * t), p[veh.id_tcoast])
+                # J[veh.id_q, veh.id_tcoast] = quatL(traj.q0) * [-sin(norm(traj.ω0 * p[veh.id_tcoast]) / 2); traj.ω0 / norm(traj.ω0) * cos(norm(traj.ω0 * p[veh.id_tcoast]) / 2)] * norm(traj.ω0) / 2
+                # will fail if norm(traj.ω0) = 0
                 J[veh.id_ω, veh.id_tcoast] = zeros(3)
-                J[veh.id_T, veh.id_tcoast] = zeros(3)
+                J[veh.id_T, veh.id_tcoast] = traj.Ṫ0
                 J[veh.id_Ṫ, veh.id_tcoast] = zeros(3)
+
+                # if norm(ForwardDiff.derivative(t -> quatL(traj.q0) * wexp(traj.ω0 * t), p[veh.id_tcoast]) - J[veh.id_q, veh.id_tcoast]) > 1e-5
+                #     println("Warning: Intial costraint derivative wrong.") 
+                # end 
 
                 return -J
             end,
@@ -347,27 +360,25 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
                 veh = pbm.mdl.veh
                 traj = pbm.mdl.traj
 
-                xf = zeros(9)
+                xf = zeros(6)
                 xf[1] = traj.rN[3]
                 xf[2:3] = traj.qN[2:3]
                 xf[4:6] = traj.ωN
-                xf[7:9] = traj.TN
 
-                return x[vcat(veh.id_r[3], veh.id_quat[2:3], veh.id_ω, veh.id_T)] - xf
+                return x[vcat(veh.id_r[3], veh.id_quat[2:3], veh.id_ω)] - xf
             end,
             (x, p, pbm) -> begin # Jacobian wrt x 
                 veh = pbm.mdl.veh
                 traj = pbm.mdl.traj
 
-                J = zeros(9, pbm.nx)
+                J = zeros(6, pbm.nx)
                 J[1, veh.id_r[3]] = 1
                 J[2:3, veh.id_quat[2:3]] = I(2)
                 J[4:6, veh.id_ω] = I(3)
-                J[7:9, veh.id_T] = I(3)
 
                 return J
             end,
-            (x, p, pbm) -> zeros(9, pbm.np), # Jacobian wrt p
+            (x, p, pbm) -> zeros(6, pbm.np), # Jacobian wrt p
         )
 end
 
