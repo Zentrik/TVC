@@ -18,6 +18,12 @@ export RocketTrajectoryParameters, RocketProblem
     MotorFired::Bool = false
     ExpectedIgnitionTime::R = 0. #(0.7 - 0.419), # varies from 0.605 - 0.419 to 0.8 - 0.419
     # Don't change from 0
+    
+    PreviousTrajectoryState::ContinuousTimeTrajectory = ContinuousTimeTrajectory([0], [0], :linear)
+    PreviousTrajectoryInput::ContinuousTimeTrajectory = ContinuousTimeTrajectory([0], [0], :linear)
+    PreviousTrajectoryCurrentTime::R = 0. # Current time relative to previous trajectory, i.e. sample(, current time) gives the previous trajectory's solution at the current time.
+    PreviousTrajectoryP:: R = 0. # Best estimate for p relative to current time.
+    UsePreviousTrajectory::Bool = false
 
     rN = @SVector zeros(3) # Final Position
     vN = @SVector zeros(3) # Final Velocity

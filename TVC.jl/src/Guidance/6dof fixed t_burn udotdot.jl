@@ -96,28 +96,36 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
         traj = pbm.mdl.traj
         atmos = pbm.mdl.atmos
 
-        p = [0.0] # ignite immediately.
+        if traj.UsePreviousTrajectory
+            p = [traj.PreviousTrajectoryP]
 
-        # motorTimeRemaining = veh.BurnTime - traj.t0 # how much motor time remaining
+            SampleTimes = collect(range(traj.PreviousTrajectoryCurrentTime, 1, N))
+            x = mapreduce(t -> sample(traj.PreviousTrajectoryState, t), hcat, SampleTimes)
+            u = mapreduce(t -> sample(traj.PreviousTrajectoryInput, t), hcat, SampleTimes)
+        else
+            p = [0.0] # ignite immediately.
 
-        # dt = motorTimeRemaining / (N - 1) # for convex constraints
+            # motorTimeRemaining = veh.BurnTime - traj.t0 # how much motor time remaining
 
-        x = zeros(pbm.nx, N)
-        u = zeros(pbm.nu, N)
+            # dt = motorTimeRemaining / (N - 1) # for convex constraints
 
-        x[veh.id_r, :] = straightline_interpolate(traj.r0, traj.rN, N)
-        x[veh.id_v, :] = straightline_interpolate(traj.v0, traj.vN, N)
-        x[veh.id_ω, :] = straightline_interpolate(traj.ω0, traj.ωN, N)
+            x = zeros(pbm.nx, N)
+            u = zeros(pbm.nu, N)
 
-        x[veh.id_T, :] = straightline_interpolate(traj.T0, traj.TN, N)  
-        x[veh.id_Ṫ, :] = straightline_interpolate(traj.Ṫ0, traj.ṪN, N) 
-        
-        u = straightline_interpolate([0; 0; 0; 0], [0; 0; 0; 0], N)
-        
-        for k = 1:N
-            mix = (k - 1) / (N - 1)
+            x[veh.id_r, :] = straightline_interpolate(traj.r0, [traj.r0[1:2]; traj.rN[3]], N)
+            x[veh.id_v, :] = straightline_interpolate(traj.v0, traj.vN, N)
+            x[veh.id_ω, :] = straightline_interpolate(traj.ω0, traj.ωN, N)
+
+            x[veh.id_T, :] = straightline_interpolate(traj.T0, traj.TN, N)  
+            x[veh.id_Ṫ, :] = straightline_interpolate(traj.Ṫ0, traj.ṪN, N) 
             
-            x[veh.id_quat, k] = slerp_quat(traj.q0, traj.qN, mix)
+            u = straightline_interpolate([0; 0; 0; 0], [0; 0; 0; 0], N)
+            
+            for k = 1:N
+                mix = (k - 1) / (N - 1)
+                
+                x[veh.id_quat, k] = slerp_quat(traj.q0, [traj.q0[1]; traj.qN[2:3]; traj.q0[4]], mix)
+            end
         end
 
         return x, u, p
@@ -125,48 +133,6 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
 
     return nothing
 end
-
-# function set_guess!(pbm::TrajectoryProblem)::Nothing
-#     problem_set_guess!(pbm, (N, pbm) -> begin
-#         veh = pbm.mdl.veh
-#         traj = pbm.mdl.traj
-#         atmos = pbm.mdl.atmos
-
-#         dt = veh.BurnTime / (N - 1) # for convex constraints
-
-#         t_coast = 0.0
-#         t_burn = veh.BurnTime - traj.t0
-
-#         x0 = zeros(pbm.nx)
-#         x0[veh.id_r] .= traj.r0 + traj.v0 * t_coast + atmos.g(traj.r0[3]) * t_coast^2/2
-#         x0[veh.id_v] .= traj.v0 + atmos.g(traj.r0[3]) * t_coast
-#         x0[veh.id_quat] .= traj.q0
-#         x0[veh.id_ω] = traj.ω0
-#         x0[veh.id_T] = traj.T0
-#         x0[veh.id_Ṫ] = traj.Ṫ0
-
-#         xf = [traj.rN; traj.vN; traj.qN; traj.ωN; traj.TN; traj.ṪN][[veh.id_r; veh.id_v; veh.id_quat; veh.id_ω; veh.id_T; veh.id_Ṫ]];
-
-#         x = zeros(pbm.nx, N)
-#         u = zeros(pbm.nu, N)
-        
-#         p = [t_coast]
-
-#         for k = 1:N
-#             t = (k - 1) / (N - 1) * t_burn
-
-#             x[:, k] = (t_burn - t) / t_burn * x0 + t / t_burn * xf
-#             mix = (k - 1) / (N - 1)
-#             x[veh.id_quat, k] = slerp_quat(x0[veh.id_quat], xf[veh.id_quat], mix)
-
-#             u[:, k] = [0; 0; 0; 0]
-#         end
-
-#         return x, u, p 
-#     end)
-
-#     return nothing
-# end
     
 function set_cost!(pbm::TrajectoryProblem)::Nothing
     problem_set_terminal_cost!(
@@ -175,33 +141,6 @@ function set_cost!(pbm::TrajectoryProblem)::Nothing
 
     return nothing
 end
-
-# Id = Diagonal([0.0826975856, 0.0826975856, 2.4778e-04])
-# invId = Diagonal([5.0, 5.0, 25.0])
-
-## Testing Jacobians
-# using Symbolics, LinearAlgebra
-# include("src/Quaternions.jl") 
-
-# @variables r[1:3] v[1:3] u[1:4] quat[1:4] w[1:3] T[1:3] T_dot[1:3] Acceleration mass;
-# r = Symbolics.scalarize(r);
-# v = Symbolics.scalarize(v);
-# quat = Symbolics.scalarize(quat);
-# w = Symbolics.scalarize(w);
-# T = Symbolics.scalarize(T);
-# T_dot = Symbolics.scalarize(T_dot);
-
-# u = Symbolics.scalarize(u);
-
-# x = [r; v; quat; w; T; T_dot];
-
-# x_dot = [v; g + rotate(quat, T) * Acceleration; 1/2 * quatL(quat) * [0; w]; invId * (cross([0; 0; -0.4], T * Acceleration * mass) + [0; 0; u[4]] - cross(w, Id * w)); T_dot; u[1:3]]
-# A_sym = Symbolics.jacobian(x_dot, x)
-# B_sym = Symbolics.jacobian(x_dot, u)
-
-# f = build_function(x_dot, x, u, Thrust, expression=Val{false})[1]
-# A = build_function(A_sym, x, u, Thrust, expression=Val{false})[1]
-# B = build_function(B_sym, x, u, Thrust, expression=Val{false})[1]   
 
 function set_dynamics!(pbm::TrajectoryProblem)::Nothing
     function f_t(x, u, t, pbm)
@@ -247,13 +186,6 @@ function set_dynamics!(pbm::TrajectoryProblem)::Nothing
 
         return B
     end
-
-    # x = rand(19, 1);
-    # u = rand(4, 1);
-    # Thrust = rand()
-    # count(f(x, u, Thrust) - f_t(x, u, Thrust) .> 1e-10)
-    # count(A(x, u, Thrust) - A_t(x, u, Thrust) .> 1e-10)
-    # count(B(x, u, Thrust) - B_t(x, u, Thrust) .> 1e-10)
 
     # Dynamics
     problem_set_dynamics!(

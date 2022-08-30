@@ -9,7 +9,18 @@ SCP Problem requires 2 iterations to stop, as we need to see change in solution 
 - More accurate actuator model, account for torque exerted by gimbal moving.
 - @unpack?
 - Switch to Rotations.jl
-- ModellingToolkit.jl?
+- ModellingToolkit.jl? 
+<br>
+<br>
+- Add realistic wind.
+<br>
+<br>
+- Look at style guide and fix capital letters/_ in function/variable struct names.
+<br>
+<br>
+<br>
+<br>
+- Add MEKF (https://github.com/ChiyenLee/EKF.jl)
 
 ### Performance Improvements
 - Deal with functions in structs better, e.g. use function wrappers or parameterise their type.
