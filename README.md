@@ -60,3 +60,5 @@ It would probably be best to look at other implementations of the barrowman equa
 [SCP Toolbox and links to papers on SCvx, PTR and GuSTO](https://www.malyuta.name/optimization/tooling/2021/07/15/scp-tutorial.html)
 
 [Post on GFOLD](https://tealquaternion.netlify.app/post/gfold-2007/)
+
+[Lecture Notes on Optimal Spacecraft Guidance](https://profmattharris.files.wordpress.com/2022/05/osg_v02.pdf)
