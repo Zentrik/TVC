@@ -1,6 +1,7 @@
 # TODO: Make quaternion discretisation more accurate. Without constraint on quaternion norm, the norm of the quaternion strays from 1, I think this is due to the Jacobians of dynamics being evaluated about a reference trajectory that has non unit quaternions.
 
 using SCPToolbox
+# import SCPToolbox.Parser.@perturb_fix
 
 using LinearAlgebra
 # using ECOS
@@ -10,13 +11,14 @@ import ..Utils: rotate, skew
 using ..Guidance
 
 using ForwardDiff
+using JuMP
 
 export define_problem!
 
 # Per Successive Convexification for Mars 6-DoF Powered Descent Landing Guidance, 2017. Set control to second derivative of thrust vector
 # This allows me to add a constraint on the tvc gimbal rate and it adds more degrees of freedom on the control/ allows for more complex control for a given N (no. of discretisation steps) improving cost.
 
-function define_problem!(pbm::TrajectoryProblem)::Nothing
+function define_problem!(pbm::TrajectoryProblem, algo::Symbol)::Nothing
     set_dims!(pbm)
     set_scale!(pbm)
     set_cost!(pbm)
@@ -24,6 +26,10 @@ function define_problem!(pbm::TrajectoryProblem)::Nothing
     set_integration_action(pbm)
     set_convex_constraints!(pbm)
     set_bcs!(pbm)
+
+    if algo == :scvx
+        problem_set_s!(pbm, algo, (t, k, x, u, p, pbm) -> [0])
+    end
 
     set_guess!(pbm)
 
@@ -41,12 +47,12 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     advise! = problem_advise_scale!
 
     # States
-    advise!(pbm, :state, 1, (-1000.0, 1000.0))
-    advise!(pbm, :state, 2, (-1000.0, 1000.0))
-    advise!(pbm, :state, 3, (0.0, 1000.0))
-    advise!(pbm, :state, 4, (-100.0, 100.0))
-    advise!(pbm, :state, 5, (-100.0, 100.0))
-    advise!(pbm, :state, 6, (-100.0, 100.0))
+    advise!(pbm, :state, 1, (-100.0, 100.0))
+    advise!(pbm, :state, 2, (-100.0, 100.0))
+    advise!(pbm, :state, 3, (0.0, 100.0))
+    advise!(pbm, :state, 4, (-50.0, 50.0))
+    advise!(pbm, :state, 5, (-50.0, 50.0))
+    advise!(pbm, :state, 6, (-50.0, 50.0))
 
     advise!(pbm, :state, 7, (-1.0, 1.0))
     advise!(pbm, :state, 8, (-1.0, 1.0))
@@ -137,6 +143,7 @@ end
 function set_cost!(pbm::TrajectoryProblem)::Nothing
     problem_set_terminal_cost!(
         pbm, (x, p, pbm) -> dot(x[pbm.mdl.veh.id_v] - pbm.mdl.traj.vN, x[pbm.mdl.veh.id_v] - pbm.mdl.traj.vN)
+        # 0 # use for feasibility testing
     )
 
     return nothing
@@ -312,6 +319,35 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
             end,
             (x, p, pbm) -> zeros(6, pbm.np), # Jacobian wrt p
         )
+
+        # problem_set_bc!(
+        #     pbm, :tc, # Terminal condition
+        #     (x, p, pbm) -> begin
+        #         veh = pbm.mdl.veh
+        #         traj = pbm.mdl.traj
+
+        #         xf = zeros(9)
+        #         xf[1] = traj.rN[3]
+        #         xf[2:3] = traj.qN[2:3]
+        #         xf[4:6] = traj.ωN
+        #         xf[7:9] = traj.vN
+
+        #         return x[vcat(veh.id_r[3], veh.id_quat[2:3], veh.id_ω, veh.id_v)] - xf
+        #     end,
+        #     (x, p, pbm) -> begin # Jacobian wrt x 
+        #         veh = pbm.mdl.veh
+        #         traj = pbm.mdl.traj
+
+        #         J = zeros(9, pbm.nx)
+        #         J[1, veh.id_r[3]] = 1
+        #         J[2:3, veh.id_quat[2:3]] = I(2)
+        #         J[4:6, veh.id_ω] = I(3)
+        #         J[7:9, veh.id_v] = I(3)
+
+        #         return J
+        #     end,
+        #     (x, p, pbm) -> zeros(9, pbm.np), # Jacobian wrt p
+        # )
 end
 
 function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
@@ -328,11 +364,15 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                 end)
 
             if traj.MotorFired
-                @add_constraint(
-                    ocp, ZERO, "t_coast == 0", (p[veh.id_tcoast],), begin
-                        local t_coast = arg[1]
-                        t_coast
-                    end)
+                # @add_constraint(
+                #     ocp, ZERO, "t_coast == 0", (p[veh.id_tcoast],), begin
+                #         local t_coast = arg[1]
+                #         t_coast
+                #     end)
+                fix(variable_by_name(jump_model(ocp), "p"), 0.) # need to change if p has more than one element.
+                # Probably doesn't matter, Gurobi seems to be able to equate the two above in its presolve, ECOS doesn't but it returns p on the order of 1e-8 or below with first constraint.
+
+                # @perturb_fix p[veh.id_tcoast] # fix to initial guess which is 0? # doesn't seem to work well
             else
                 @add_constraint(
                     ocp, NONPOS, "t_coast >= expected ignition time", (p[veh.id_tcoast],), begin
@@ -348,7 +388,7 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                 end)
 
             @add_constraint(
-                ocp, SOC, "Thrust Gimal angle < delta_max", (x[veh.id_T],), begin
+                ocp, SOC, "Thrust Gimal angle <= delta_max", (x[veh.id_T],), begin
                     local Thrust = arg[1]
                     [Thrust[3] / cos(pi * 5/180); Thrust]
                 end)
@@ -358,12 +398,6 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                     local quat = arg[1]
                     [1; quat]
                 end)
-
-            # @add_constraint(
-            # ocp, SOC, "TVC angular velocity <= Max", (x[veh.id_Ṫ],), begin
-            #     local u = arg[1]
-            #     [deg2rad(5); u] # Angular velocity is r × v / ||r||², v = u, assume u is ⊥ r and ||r||² = 1, so angular velocity is v = u. 
-            # end)
 
             @add_constraint(
             ocp, SOC, "TVC angular velocity <= Max", (x[veh.id_Ṫ],), (u) -> [deg2rad(5); u]) # Angular velocity is r × v / ||r||², v = u, assume u is ⊥ r and ||r||² = 1, so angular velocity is v = u.

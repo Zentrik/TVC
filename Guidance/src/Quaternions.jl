@@ -1,4 +1,4 @@
-using LinearAlgebra, TaylorSeries
+using LinearAlgebra
 
 # Quaternion kinematics for the error-state Kalman filter
 # Joan Sola

@@ -96,11 +96,12 @@ function mpc!(integrator) # what if motor is spent, is this dealt with properly?
     end
 
     mdl = RocketProblem(veh, atmos, traj)
+
+    println("\n", traj, "\n")
+
     tmpSolution = solveProblem(mdl)
 
     println(tmpSolution.status)
-
-    println("\n", traj, "\n")
 
     if tmpSolution.status == "SCP_SOLVED"
         integrator.p.solution[] = tmpSolution  
@@ -166,10 +167,12 @@ cbs = CallbackSet(cb, mpccb)#, scb);
 sol = DifferentialEquations.solve(prob, callback=cbs)
 # sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cbs)
 
-println(sol.u[end][mdl.veh.id_v])
+println("Estimated Coast time (s): ", solution.p[1])
+println("Coast time (s): ", sol.prob.p.MotorIgnitionTime[])
+println("Burn Time (s) ", sol.t[end] - sol.prob.p.MotorIgnitionTime[])
 
-println(sol.prob.p.MotorIgnitionTime[])
-println(sol.t[end] - sol.prob.p.MotorIgnitionTime[])
+println("Estimated Impact Velocity Magnitude (m/s): ", solution.cost^0.5)
+println("True Impact Velocity Magnitude (m/s): ", norm(sol.u[end][mdl.veh.id_v] - mdl.traj.vN))
 
 Plots.plot(sol, idxs=veh.id_r)
 Plots.plot!(sol.prob.p.MotorIgnitionTime .+ sol.prob.p.traj.t0 .+ (mdl.veh.BurnTime - sol.prob.p.traj.t0) * solution.td, solution.xd[mdl.veh.id_r, :]')
