@@ -35,6 +35,8 @@ Formulation](https://orbit.dtu.dk/files/98594729/Satdyn_mb_2010f.pdf)
 
 [Basic tutorials in control theory](https://ctms.engin.umich.edu/CTMS/index.php?aux=Home)
 
+https://thenumb.at/Exponential-Rotations/
+
 ## Dynamics
 
 The kinematics of a 6 DOF rigid body are described [here](https://mathworks.com/help/aeroblks/6dofeulerangles.html#mw_2f302a65-767b-4836-81d3-8d9423421b84) and the quaternion derivative is [here](https://mathworks.com/help/aeroblks/customvariablemass6dofquaternion.html) (this is just standard 1/2 * quaternion * angular velocity (in body coordinates)).

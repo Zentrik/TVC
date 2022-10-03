@@ -27,6 +27,7 @@ ECOS works decently
 Basically need to add targeting of minimum landing position error if thrust constraint is violated because it can easily land with 0 velocity.
 - Allow for rocket to land after motor finishes burning.
 - Allow rocket to land earlier when close to surface/ motor about to finish otherwise it might be infeasible?
+- Penalise horizontal velocity more when landing than vertical to prevent tipping over?
 <br>
 <br>
 <br>

@@ -216,7 +216,13 @@ function set_integration_action(pbm::TrajectoryProblem)::Nothing
     problem_set_integration_action!(
         pbm, pbm.mdl.veh.id_quat,
         (q, pbm) -> begin
-            qn = q / norm(q)
+            if norm(q) ≈ 0
+                print(q)
+                qn = q
+            else
+                qn = q / norm(q)
+            end
+            
             return qn
     end)
 
