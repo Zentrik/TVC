@@ -41,6 +41,9 @@ solution = solveProblem(mdl);
 #     return Actuator(x, p, t, desired_tvc, desired_roll)
 # end
 
+const RollRateGain = 10.0   # 1/s on the roll rate error
+const MaxRollTorque = 0.1   # N m, matches the guidance problem's limit
+
 function control(x, p, t)
     veh = p.veh
     tₘ = motorTime(t, p.MotorIgnitionTime)
@@ -57,7 +60,16 @@ function control(x, p, t)
         # marked Throttleable), so this normalisation is a no-op rather than the
         # plan's vertical channel being silently discarded.
         desired_tvc = normalize(sample(sol.xc, time)[veh.id_T])
-        desired_roll = sample(sol.uc, time)[veh.id_roll]
+        # Feedforward the plan's roll torque and close a loop on the roll
+        # *rate error*. The plan's ω_z is what its gyroscopic steering needs
+        # and it ends at zero, so tracking it keeps the effector while
+        # actually arriving with the roll the plan intended. Driving ω_z to
+        # zero instead, or bounding it in the guidance, removes the effector
+        # and the vehicle tumbles — see docs/mpc-feasibility.md.
+        desired_roll = clamp(sample(sol.uc, time)[veh.id_roll][1] +
+                             RollRateGain * veh.InertiaTensor[3, 3] *
+                             (sample(sol.xc, time)[veh.id_ω[3]] - x[veh.id_ω[3]]),
+                             -MaxRollTorque, MaxRollTorque)
     else
         desired_tvc = zeros(3)
         desired_roll = 0.

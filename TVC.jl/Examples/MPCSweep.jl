@@ -11,6 +11,8 @@ using TVC, SCPToolbox, LinearAlgebra, Printf, Clarabel
 
 const atmos = Atmosphere()
 const MinimumReplanTime = 0.5
+const RollRateGain = 10.0   # 1/s on the roll rate error
+const MaxRollTorque = 0.1   # N m, matches the guidance problem's limit
 
 mutable struct Plant
     veh::Any
@@ -55,7 +57,16 @@ function fly(label, traj0; veh = RocketParameters(), mpcΔt = 0.25, dt = 0.002)
         if t0Plan <= tₘ <= tLand && tₘ >= 0
             τ = clamp((tₘ - t0Plan) / (tLand - t0Plan), 0.0, 1.0)
             dir = normalize(sample(plan.xc, τ)[veh.id_T])
-            roll = sample(plan.uc, τ)[veh.id_roll][1]
+            # Feedforward the plan's roll torque and close a loop on the roll
+            # *rate error*. The plan's ω_z is what its gyroscopic steering needs
+            # and it ends at zero, so tracking it keeps the effector while
+            # actually arriving with the roll the plan intended. Driving ω_z to
+            # zero instead, or bounding it in the guidance, removes the effector
+            # and the vehicle tumbles — see docs/mpc-feasibility.md.
+            roll = clamp(sample(plan.uc, τ)[veh.id_roll][1] +
+                         RollRateGain * veh.InertiaTensor[3, 3] *
+                         (sample(plan.xc, τ)[veh.id_ω[3]] - x[veh.id_ω[3]]),
+                         -MaxRollTorque, MaxRollTorque)
         else
             dir = zeros(3); roll = 0.0
         end
