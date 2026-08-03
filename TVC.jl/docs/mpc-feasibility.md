@@ -16,13 +16,15 @@ experiments.
 There are two independent problems, and they have to be separated because they
 call for completely different fixes.
 
-1. **The solve does not fail because the problem is infeasible.** PTR relaxes
-   the dynamics *and* both boundary conditions with virtual controls, so the
-   conic subproblem it hands to ECOS is essentially always primal feasible.
-   Every failure observed was `SCP_FAILED (NUMERICAL_ERROR)` — ECOS breaking
-   down — or an outright `SingularException` crash inside the toolbox. In the
-   `NUMERICAL_ERROR` cases PTR had *already* produced a perfectly usable
-   trajectory on an earlier iteration and threw it away.
+1. **The solve does not fail because the problem is infeasible — ECOS is
+   failing.** PTR relaxes the dynamics *and* both boundary conditions with
+   virtual controls, so the conic subproblem it hands to the solver is
+   essentially always primal feasible. Every failure observed was
+   `SCP_FAILED (NUMERICAL_ERROR)` — ECOS breaking down — or an outright
+   `SingularException` crash inside the toolbox, and in the `NUMERICAL_ERROR`
+   cases PTR had *already* produced a usable trajectory on an earlier iteration
+   and threw it away. Handing the identical problems to Clarabel instead solves
+   all of them.
 2. **The problem is nonetheless nearly uncontrollable in the vertical axis
    once the motor is lit**, so even when it does solve, the MPC has almost no
    authority to correct a disturbance. This is a formulation issue, not a bug.
@@ -151,10 +153,29 @@ In rough order of value for effort:
    of iterations with large virtual controls, i.e. when the returned trajectory
    does not satisfy the dynamics or the boundary conditions.
    `Examples/MPC_Simulation.jl` currently accepts any `SCP_SOLVED` plan.
-4. **Try a different conic solver.** The README already notes that Mosek and
-   Gurobi sometimes work where ECOS fails. Clarabel is worth a look too — it
-   is open source, handles the SOC/exponential cones this problem uses, and is
-   generally better behaved than ECOS on badly scaled problems.
+4. **Change conic solver — this is the one that actually fixes it.** The README
+   already notes that Mosek and Gurobi sometimes work where ECOS fails.
+   [Clarabel](https://github.com/oxfordcontrol/Clarabel.jl) is open source and
+   is a drop-in `solver` for `PTR.Parameters`. On the sweep above it goes from
+   **12/21 to 21/21** — including the `SingularException` at `h0 = 22 m`:
+
+   | `h0` (m) | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26–36 |
+   |---|---|---|---|---|---|---|---|---|---|---|---|
+   | ECOS | FAIL | ok | FAIL | FAIL | FAIL | FAIL | **crash** | FAIL | FAIL | FAIL | ok |
+   | Clarabel | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+
+   It also converges to a genuinely better answer where ECOS gave up: on
+   `h0 = 18…25 m` Clarabel reaches `J ≈ 2e-7`, a 0.5 mm/s touchdown, against
+   the `~1e-3` (3 cm/s) of the iterate ECOS discarded. The cost is iteration
+   count — Clarabel took 5–47 SCP iterations against ECOS's 3–30, and it is the
+   awkward low-altitude cases that need the most, so budget for that if this
+   has to run at 4 Hz. Swap it in with
+
+   ```julia
+   solver, options = Clarabel, Dict("verbose" => false)
+   ```
+
+   in `src/Guidance/run.jl`.
 
 ## 2. The vehicle has almost no vertical authority once the motor is lit
 

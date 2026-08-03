@@ -23,14 +23,14 @@ atmos = Atmosphere()
 Same problem `solveProblem` builds, but returns `(sol, hist)` so the individual
 PTR iterations can be inspected. `run.jl` throws the history away.
 """
-function solveWithHistory(mdl; iter_max=50, ε_abs=1e-5, ε_rel=1e-3,
+function solveWithHistory(mdl; iter_max=50, ε_abs=1e-5, ε_rel=1e-3, solver=ECOS,
                           options=Dict{String, Any}("verbose" => 0))
     pbm = TrajectoryProblem(mdl)
     TVC.Guidance.define_problem!(pbm, :ptr)
 
     N = max(floor(Int, (mdl.veh.BurnTime - mdl.traj.t0) / 0.4) + 2, 5)
     pars = PTR.Parameters(N, 100, iter_max, FOH, 5e3, 1e-2, ε_abs, ε_rel, 1e-2,
-                          Inf, Inf, ECOS, options)
+                          Inf, Inf, solver, options)
 
     return PTR.solve(PTR.create(pars, pbm))
 end
@@ -93,7 +93,14 @@ println("Ignition altitude sweep, default PTR settings")
 statusSweep()
 
 println("\nSame sweep, stopping one iteration earlier (ε_rel = 1e-2)")
-statusSweep(ε_rel=1e-2)
+statusSweep(ε_rel=1e-2) # no effect, the convergence test cannot see the bad
+                        # subproblem coming
+
+# `] add Clarabel` and uncomment: this solves every case ECOS fails on, though
+# it needs more SCP iterations to get there.
+# using Clarabel
+# println("\nSame sweep, Clarabel instead of ECOS")
+# statusSweep(solver=Clarabel, options=Dict{String, Any}("verbose" => false))
 
 #   Re-solving part way through the burn
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
