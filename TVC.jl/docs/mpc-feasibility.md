@@ -458,12 +458,40 @@ all roll, and it is entirely self inflicted:
   same 4000× scale mismatch §1 lists as a conditioning problem, showing up as a
   physical symptom.
 
-The scaling fix lowers the noise floor but is not a cure. If roll rate at
-touchdown matters, the fixes are a running cost on the input (so `u₄` is driven
-to zero rather than left wherever the solver stops), reinstating a bound on `‖ω‖`,
-or simply closing a proportional rate loop on roll in the controller instead of
-tracking the planned torque open loop — 404 rad/s² makes that trivial. None of
-these are measured yet.
+A running cost on the input was the obvious fix, and it does not work. Sweeping
+`InputCostWeight` on the nominal solve:
+
+| weight | `max\|u₄\|` | `max‖T̈‖` (limit 0.1745) | `max\|ω_z\|` | touchdown |
+|---|---|---|---|---|
+| 0 | 5.67e-4 | 0.1745 (saturated) | 0.067 | 0.525 m/s |
+| 0.01 | 9.64e-4 | 0.1745 (saturated) | 0.142 | 0.524 m/s |
+| 1 | 1.15e-4 | 0.0940 | 0.048 | 0.571 m/s |
+| 100 | 5.45e-4 | 0.0269 | 0.099 | 0.626 m/s |
+
+The cost is definitely reaching the objective — `T̈` desaturates cleanly and
+monotonically, and the landing degrades as you would expect. But `u₄` does not
+respond at all: it sits between 1e-4 and 1e-3 at every weight, including one
+that squeezes the gimbal input to 15% of its limit at the price of 19% of
+touchdown speed. **That residual is a numerical floor, not something the
+optimiser is choosing**, which is consistent with where it comes from: in scaled
+units the roll column of `B` is ~139 against O(1) for every other channel, so
+roll is where the solver's residual lands. You cannot cost your way out of it.
+
+So the running cost is worth keeping for what it actually does — a smoother
+gimbal command, and the input is no longer a formally degenerate direction — but
+the roll fix has to be elsewhere. **Close a proportional rate loop on roll in the
+controller** instead of tracking the planned `u₄` open loop: with 404 rad/s²
+available it nulls rad/s of roll in milliseconds, and it does not care what the
+guidance thinks. That is not implemented yet.
+
+The `‖ω‖` bound is back, as `MaxAngularVelocity`, defaulting to 2π rad/s and
+applied from node 2 onward — node 1 is pinned to the measured state by the
+initial condition, so bounding it there would fight the measurement rather than
+shape the trajectory. It is a safety net rather than a design constraint: the
+nominal solve peaks at `‖ω‖ = 0.293 rad/s`, so it never binds. The π/2 that used
+to be here (commented out) is below rates that legitimately appear in the
+recorded flight states in `Examples/FeasibilityTests.jl`, which is presumably
+why it was removed.
 
 ## 5. Bugs found
 

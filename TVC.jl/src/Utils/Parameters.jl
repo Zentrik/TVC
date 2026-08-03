@@ -38,6 +38,27 @@ export RocketParameters
     # to fall ballistically once the motor is spent.
     FixedLandingTime::Bool = false
 
+    # Weight on the running cost, in units of the terminal cost (m²/s²): holding
+    # one input channel at its limit for the whole flight costs this much, so
+    # 0.01 is worth 0.1 m/s of touchdown speed. Without it nothing in the
+    # problem prefers a small input at all.
+    #
+    # It buys a smoother gimbal command — measured on the nominal solve,
+    # max‖T̈‖ goes 0.1745 (saturated) at w = 0.01, to 0.0940 at w = 1, to 0.0269
+    # at w = 100, against touchdown speeds of 0.524, 0.571 and 0.626 m/s. Pick
+    # a point on that curve to taste.
+    #
+    # It does *not* fix the roll rate. max|u₄| is 1e-4 to 1e-3 at every weight
+    # above, so that residual is a numerical floor, not something the optimiser
+    # is choosing — see docs/mpc-feasibility.md.
+    InputCostWeight = 0.01
+
+    # Loose bound on ‖ω‖, a safety net rather than a design constraint. The
+    # value that used to be here (commented out) was π/2, which is below rates
+    # that legitimately show up in recorded flight states, so it would have
+    # fought the initial condition rather than shaping the trajectory.
+    MaxAngularVelocity = 2 * pi
+
     # How long after burnout the guidance will plan an unpowered fall for.
     # Touchdown is never allowed before BurnTime: thrust to weight is ~1.35, so
     # a rocket that reaches the ground under thrust takes off again.

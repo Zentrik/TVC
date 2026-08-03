@@ -21,7 +21,7 @@ export define_problem!
 function define_problem!(pbm::TrajectoryProblem, algo::Symbol)::Nothing
     set_dims!(pbm)
     set_scale!(pbm)
-    set_cost!(pbm)
+    set_cost!(pbm, algo)
     set_dynamics!(pbm)
     set_integration_action(pbm)
     set_convex_constraints!(pbm)
@@ -149,11 +149,27 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
     return nothing
 end
     
-function set_cost!(pbm::TrajectoryProblem)::Nothing
+function set_cost!(pbm::TrajectoryProblem, algo::Symbol)::Nothing
     problem_set_terminal_cost!(
         pbm, (x, p, pbm) -> dot(x[pbm.mdl.veh.id_v] - pbm.mdl.traj.vN, x[pbm.mdl.veh.id_v] - pbm.mdl.traj.vN)
         # 0 # use for feasibility testing
     )
+
+    # Quadratic running cost on the input, each channel normalised by its own
+    # limit so the two contribute comparably. Without this the inputs are free:
+    # nothing in the problem prefers a small one, so they end up wherever the
+    # solver happens to stop, and the gimbal command sits saturated.
+    #
+    # Note this does not fix the roll rate, which was the original motivation —
+    # max|u₄| stays at 1e-4 to 1e-3 across four orders of magnitude of weight.
+    # See docs/mpc-feasibility.md.
+    problem_set_running_cost!(
+        pbm, algo, (t, k, x, u, p, pbm) -> begin
+            veh = pbm.mdl.veh
+
+            veh.InputCostWeight * (dot(u[veh.id_T̈], u[veh.id_T̈]) / deg2rad(10)^2 +
+                                   dot(u[veh.id_roll], u[veh.id_roll]) / 0.1^2)
+        end)
 
     return nothing
 end
@@ -495,11 +511,15 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
             @add_constraint(
             ocp, SOC, "TVC angular velocity <= Max", (x[veh.id_Ṫ],), (u) -> [deg2rad(5); u]) # Angular velocity is r × v / ||r||², v = u, assume u is ⊥ r and ||r||² = 1, so angular velocity is v = u.
 
-        # @add_constraint(
-        #     ocp, SOC, "|w| < w_max", (x[11:13],), begin
-        #         local w = arg[1]
-        #         [pi / 2; w]
-        #     end)
+            if k > 1 # node 1 is pinned to the measured state by the initial
+                # condition, so bounding it here would fight the measurement
+                # rather than shape the trajectory.
+                @add_constraint(
+                    ocp, SOC, "|w| <= w_max", (x[veh.id_ω],), begin
+                        local ω = arg[1]
+                        [veh.MaxAngularVelocity; ω]
+                    end)
+            end
     end)
 
     # Convex Input Constraints
