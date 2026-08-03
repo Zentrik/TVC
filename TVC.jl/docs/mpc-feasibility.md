@@ -418,103 +418,77 @@ guidance does not model and only re-planned every 0.25 s, arrives early anyway.
 `faster horizontal` is 0.59 s early at 9 m/s and 16° of tilt — a crash, not a
 landing.
 
-**One thing that is not authority: the roll rate.** Touchdown `‖ω‖` is 10.0 rad/s
-on `5 m lower` and 4.6 on `faster horizontal`, on flights that are otherwise
-upright. Splitting it by axis settles what it is:
+**The roll rate is a control effector, not an artefact.** Touchdown `‖ω‖` is
+10.0 rad/s on `5 m lower` and 4.6 on `faster horizontal`, on flights that are
+otherwise upright, and splitting it by axis shows it is all roll (transverse is
+0.14–0.90 rad/s, so pitch and yaw are well controlled). The obvious reading —
+that the guidance has no reason to command roll, so this must be numerical junk
+— is **wrong**, and it took two failed attempts to establish that. The evidence:
 
-| case | `ω_x` | `ω_y` | `ω_z` (roll) | transverse |
-|---|---|---|---|---|
-| 5 m lower | −0.00 | −0.14 | **−10.04** | 0.14 |
-| faster horizontal | 0.64 | −0.63 | **4.53** | 0.90 |
-| released tilted 5° | −0.14 | 0.05 | **−1.42** | 0.15 |
+* Killing roll with a proportional rate loop in the controller
+  (`u₄ = clamp(−10 I_zz ω_z, ±0.1)`) nulls roll perfectly and makes everything
+  else catastrophically worse: nominal goes from 3.36 m/s and 0.1° of tilt to
+  22.64 m/s and 76.2°, `5 m lower` to 125.6°, `released tilted 5°` to 64.6°, all
+  with 5–7 rad/s of *transverse* rate and reaching the ground 1.2 s early.
+* Tracing both flights shows why. Within 0.1 s of ignition the plan commands
+  `u₄ = 7.0e-3 N·m` and spins the vehicle to 2.9 rad/s of roll; later it reverses
+  to −0.4 and then up to 5.9 rad/s, using torques as large as `2.2e-2 N·m`. That
+  is 22% of the roll limit — deliberate actuation, three orders above the
+  `1e-4`–`1e-3` residual seen on the nominal *upright* solve, where there is
+  simply nothing for roll to do.
 
-Pitch and yaw are well controlled — transverse rates are 0.14–0.90 rad/s. It is
-all roll, and it is entirely self inflicted:
+The reason is in the Euler equation. With `I_xx = I_yy`,
 
-* **There are no roll disturbances in this model at all.** The gimbal cannot
-  produce roll torque — `MomentArm = [0; 0; −d]`, and `cross([0,0,−d], F)` has an
-  identically zero z component for any thrust vector. Aero cannot either:
-  `Croll = 0` in `PitchNormalCD`, and `ThetaRotation` is a rotation about z whose
-  third row is `[0 0 1]`. And with `I_xx = I_yy` the gyroscopic term
-  `(ω × Iω)_z = (I_yy − I_xx) ω_x ω_y` vanishes. So `ω̇_z = u₄ / I_zz` exactly:
-  every bit of roll rate at touchdown was *commanded*.
-* **The commanded torque is at solver noise level, and that is enough.** On the
-  nominal solve `max|u₄| = 7.9e-4 N·m` — 0.79% of the 0.1 N·m limit, invisible
-  unless you print it in scientific notation. But `1/I_zz = 4036 rad/(N·m·s)`, so
-  1e-4 N·m held for a second is 0.4 rad/s. The 10.04 rad/s observed needs an
-  impulse of just 2.5e-3 N·m·s, i.e. 7e-4 N·m averaged over the flight.
-* **Nothing asks for `u₄` to be small.** There is no running cost on the input at
-  all (`set_cost!` sets only a terminal cost on velocity), and the `‖ω‖ ≤ π/2`
-  path constraint is commented out. The only thing pinning roll is `ω_z = 0` at
-  the plan's *terminal* node — and in closed loop the vehicle never gets there,
-  because the plan is replaced every 0.25 s. Each plan's roll correction lives in
-  a tail that is never executed, so `ω_z` random walks on the uncorrected heads.
-  The measured profile shows exactly this shape: `~1e-5` early, growing to
-  `−4.3e-4, 6.9e-4, −7.9e-4` over the last three nodes.
-* **The input scaling made it ten times worse than necessary** (fixed).
-  `advise!(pbm, :input, 4, (-1.0, 1.0))` against a constraint of `|u₄| ≤ 0.1`
-  meant the scaled variable only ever used a tenth of its range, so an absolute
-  tolerance in scaled units mapped to ten times more physical torque. This is the
-  same 4000× scale mismatch §1 lists as a conditioning problem, showing up as a
-  physical symptom.
+```
+ω̇_x = τ_x/I_xx + (1 − I_zz/I_xx) ω_y ω_z ≈ τ_x/I_xx + ω_y ω_z
+ω̇_y = τ_y/I_yy − (1 − I_zz/I_yy) ω_x ω_z ≈ τ_y/I_yy − ω_x ω_z
+```
 
-A running cost on the input was the obvious fix, and it does not work. Sweeping
-`InputCostWeight` on the nominal solve:
+so roll rate **precesses the transverse rate vector** at rate `ω_z`. And because
+`I_zz` is 300× smaller than `I_xx`, spinning up costs 300× less torque than
+rotating in pitch or yaw. The guidance has found that roll is a cheap gyroscopic
+steering effector and it uses it: at `ω_z = 5.9 rad/s` the transverse rate vector
+makes a full turn in about a second. Remove that channel and the plan is no
+longer executable, which is exactly what the rate loop did.
 
-| weight | `max\|u₄\|` | `max‖T̈‖` (limit 0.1745) | `max\|ω_z\|` | touchdown |
-|---|---|---|---|---|
-| 0 | 5.67e-4 | 0.1745 (saturated) | 0.067 | 0.525 m/s |
-| 0.01 | 9.64e-4 | 0.1745 (saturated) | 0.142 | 0.524 m/s |
-| 1 | 1.15e-4 | 0.0940 | 0.048 | 0.571 m/s |
-| 100 | 5.45e-4 | 0.0269 | 0.099 | 0.626 m/s |
+So the roll rate at touchdown is a side effect of steering, not garbage. It may
+still be unwanted at contact — 570°/s is a lot to land on — but it cannot simply
+be nulled. If it needs to be bounded, it has to be bounded *inside the guidance
+problem*, where the optimiser can trade it against the steering it buys.
 
-The cost is definitely reaching the objective — `T̈` desaturates cleanly and
-monotonically, and the landing degrades as you would expect. But `u₄` does not
-respond at all: it sits between 1e-4 and 1e-3 at every weight, including one
-that squeezes the gimbal input to 15% of its limit at the price of 19% of
-touchdown speed. **That residual is a numerical floor, not something the
-optimiser is choosing**, which is consistent with where it comes from: in scaled
-units the roll column of `B` is ~139 against O(1) for every other channel, so
-roll is where the solver's residual lands. You cannot cost your way out of it.
+Two corrections to earlier readings on this page, recorded because they were both
+plausible and both wrong: the `1e-4`–`1e-3` roll torque measured on the nominal
+solve is not a "numerical floor", it is an upright vehicle with nothing to
+correct; and the running cost sweep showing `max|u₄|` unresponsive to weight was
+measuring that same do-nothing case, not a channel the optimiser was indifferent
+to.
 
-So the running cost is worth keeping for what it actually does — a smoother
-gimbal command, and the input is no longer a formally degenerate direction.
+### The dominant error is the coast, and it is aerodynamic
 
-### A roll rate loop in the controller does not work, and it is not obvious why
+The same traces turned up something larger than any of this. On the nominal
+flight, with a 1.33 s coast before ignition:
 
-The natural next step is to stop tracking the planned `u₄` and regulate roll
-directly: `ω̇_z = u₄/I_zz` with no disturbance of any kind, so proportional
-feedback on the rate is a first order system, no integral or derivative term
-called for, and 404 rad/s² nulls rad/s of roll in milliseconds. One line.
+```
+  t 0.00  tm -1.33  h 30.000  |v|  5.00  tilt  0.0°  ω = [ 0.000  0.000]
+  t 0.40  tm -0.90  h 29.216  |v|  6.28  tilt  3.9°  ω = [-0.209 -0.279]
+  t 0.90  tm -0.19  h 26.037  |v| 10.01  tilt 20.1°  ω = [-0.437 -0.582]
+  t 1.10  tm  0.03  h 24.087  |v| 11.70  tilt 28.5°  ω = [-0.437 -0.583]
+```
 
-It was tried (`u₄ = clamp(−10 I_zz ω_z, ±0.1)`) and it is a **catastrophic
-regression**, on every case:
+**The vehicle reaches ignition already 28° off vertical and rotating at
+0.74 rad/s**, entirely from aerodynamics during the unpowered coast. The airframe
+has no fins, so its centre of pressure is ahead of its centre of mass and it is
+statically unstable; with no thrust there is no gimbal torque available, and the
+roll RCS cannot help pitch or yaw. The MPC re-solves during the coast and *sees*
+the tilt, but has nothing to act with.
 
-| case | without the loop | with the loop |
-|---|---|---|
-| nominal | 3.36 m/s, 0.1° tilt, roll 0.03, transverse 0.00 | 22.64 m/s, 76.2° tilt, roll −0.00, transverse 6.86 |
-| 5 m lower | 1.74 m/s, 0.8° tilt | 17.85 m/s, **125.6°** tilt, roll 0.00, transverse 5.17 |
-| released tilted 5° | 4.64 m/s, 11.9° tilt | 20.92 m/s, 64.6° tilt, roll −0.00, transverse 7.23 |
-
-The loop does exactly what it was asked to: roll is nulled to 0.00 in all three.
-But the vehicle tumbles in *pitch and yaw*, with 5–7 rad/s of transverse rate,
-and reaches the ground 1.2 s early.
-
-This was isolated — the run labelled "without the loop" above has the running
-cost, the input rescaling and the `‖ω‖` bound all switched on, and differs from
-the bad run *only* by the roll command. So it is the loop, not the guidance
-changes.
-
-**The mechanism is not understood.** The obvious candidate — the plan expresses
-`T` in the body frame, so suppressing roll desynchronises the body roll angle
-from the plan and points the transverse thrust the wrong way in inertial space —
-does not survive arithmetic: the plan's own `ω_z` peaks at 0.14 rad/s, which is
-2° of drift over one 0.25 s replan interval, and the guidance re-solves from the
-*measured* attitude every tick anyway. Something else is going on. Until it is
-understood the loop stays out; the controller tracks the planned `u₄` as before.
-
-This is worth chasing, because the reasoning behind the loop still looks sound
-and the thing it was meant to fix is real.
+The guidance's coast model predicts none of this: the initial-condition block
+propagates position and velocity ballistically, assumes `ω` is constant, and has
+no aerodynamics at all. So every powered flight in `Examples/MPCSweep.jl` starts
+by recovering from ~30° of tilt that the planner never saw coming. That is a much
+bigger perturbation than the metre-scale altitude errors §2 is about, and it is
+the first thing to attack if landing quality matters — shorten the coast, or
+accept the recovery and check it is within the gimbal's authority.
 
 The `‖ω‖` bound is back, as `MaxAngularVelocity`, defaulting to 2π rad/s and
 applied from node 2 onward — node 1 is pinned to the measured state by the
