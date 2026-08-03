@@ -4,7 +4,8 @@
 ## Notes
 [Why the landing guidance problem often isn't solvable](docs/mpc-feasibility.md) — investigation into the
 `SCP_FAILED`/`SingularException` results when the guidance problem is re-solved from the current state.
-Reproduce with [Examples/FeasibilitySweep.jl](Examples/FeasibilitySweep.jl).
+Reproduce with [Examples/FeasibilitySweep.jl](Examples/FeasibilitySweep.jl); fly it closed loop with
+[Examples/MPCSweep.jl](Examples/MPCSweep.jl).
 
 SCP Problem requires 2 iterations to stop, as we need to see change in solution between two solves. (1st iteration is not the initial guess but the iteration from it).
 

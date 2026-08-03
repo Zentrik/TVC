@@ -382,7 +382,53 @@ leaving the terminal altitude constraint with no answer.
 **Not yet measured**: a full ignition-altitude sweep with both switches on.
 `Examples/FeasibilitySweep.jl` runs it.
 
-## 4. Bugs found
+## 4. Closed loop results
+
+[`Examples/MPCSweep.jl`](../Examples/MPCSweep.jl) flies the whole thing: TVC's
+own `f!` as the plant with `Aero = true` (the disturbance the guidance never
+sees), thrust direction taken from the current plan and applied at full motor
+thrust, and `solveProblem` re-run every 0.25 s from the measured state. Six
+release states, ordered by how hard the landing was:
+
+| release state | touchdown `‖v‖` | `v_z` | `v_xy` | tilt | `‖ω‖` | contact at motor time | solves |
+|---|---|---|---|---|---|---|---|
+| 5 m lower | 1.74 | −1.53 | 0.84 | 0.8° | 10.04 | 3.39 (**before** burnout) | 15, 0 rejected |
+| nominal | 2.46 | −2.39 | 0.60 | 0.5° | 0.15 | 3.45 (at burnout) | 16, 0 rejected |
+| already descending 3 m/s | 2.92 | −2.85 | 0.65 | 0.5° | 0.03 | 3.45 (at burnout) | 15, 0 rejected |
+| released tilted 5° | 4.64 | −4.10 | 2.18 | 11.9° | 1.43 | 3.41 (**before** burnout) | 16, 0 rejected |
+| faster horizontal (6, −5) | 9.03 | −7.99 | 4.21 | 16.0° | 4.62 | 2.86 (**before** burnout) | 14, 0 rejected |
+| 5 m higher | 12.71 | −12.12 | 3.83 | 33.5° | 0.42 | 4.27 (0.82 s ballistic) | 15, 0 rejected |
+
+**The solver is no longer the problem.** 91 guidance solves across six flights,
+zero rejected — no `SCP_FAILED`, no `SingularException`, nothing thrown. That
+was the original complaint and it is gone.
+
+**What is left is control authority, and it is the vertical channel.** Look at
+`5 m higher`: it burns out roughly 6.6 m up still moving down at ~4 m/s, then
+falls the remaining distance, arriving at 12.1 m/s. That is not the optimiser
+giving up — with `‖T‖ = 1` and a fixed impulse there is no trajectory that puts
+the vehicle at the ground with low speed from that release point. The ballistic
+tail made the problem *solvable*; nothing can make it *soft*. The two cases that
+land well (nominal and already-descending, 2.5–2.9 m/s and 0.5° of tilt) are the
+ones whose release state happens to sit near the reachable set §2 describes.
+
+**Three of six contact the ground before burnout**, which is the bounce case:
+`height ≥ 0` holds in the *plan*, but the vehicle, flying with aerodynamics the
+guidance does not model and only re-planned every 0.25 s, arrives early anyway.
+`faster horizontal` is 0.59 s early at 9 m/s and 16° of tilt — a crash, not a
+landing.
+
+**One thing to look at that is not authority.** Touchdown `‖ω‖` is 10.0 rad/s on
+`5 m lower` and 4.6 on `faster horizontal`, on flights that are otherwise
+upright — the guidance constrains `ω = 0` at the terminal node, so something is
+diverging near the end. The prime suspect is roll: `I_zz = 2.48e-4` against
+`I_xx = I_yy = 8.27e-2`, and the roll torque limit of 0.1 N·m buys ~400 rad/s²,
+so a roll command sampled from a plan every 0.25 s has enormous rate error for
+very little timing mismatch. This has not been confirmed — the sweep reports
+`‖ω‖` and not its components. Worth instrumenting before reading anything else
+into it.
+
+## 5. Bugs found
 
 ### `slerp_quat` ignores its interpolation parameter (fixed)
 
