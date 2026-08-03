@@ -287,16 +287,16 @@ would have the same optimal cost, and the relaxed solution would come out with
 
 Taking `h0 = 18 m` (Clarabel, touchdown fixed at burnout in both cases):
 
-| | optimal `J` | `min‖T‖` | touchdown speed |
+| | `sol.cost` | `min‖T‖` | touchdown speed |
 |---|---|---|---|
 | `‖T‖ ≤ 1` (relaxed) | `6.98e-06` | **0.8952** | 0.0004 m/s |
-| `‖T‖ = 1` (real vehicle) | `6.66e-04` | 1.0000 | 0.026 m/s |
+| `‖T‖ = 1` (real vehicle) | `1.77e-03` | 1.0000 | 0.0267 m/s |
 
 The relaxed optimum throttles down to **89.5%** and buys a two-orders-of-magnitude
-better cost with it. If the relaxation were lossless those two rows would agree.
-They do not, so `‖T‖ ≤ 1` is solving a strictly easier problem than the one the
-vehicle can fly — and the extra freedom is exactly the throttle a solid motor
-does not have.
+better cost with it — 0.4 mm/s of touchdown speed against 2.7 cm/s. If the
+relaxation were lossless those two rows would agree. They do not, so `‖T‖ ≤ 1` is
+solving a strictly easier problem than the one the vehicle can fly, and the extra
+freedom is exactly the throttle a solid motor does not have.
 
 The relaxation *is* much more tractable, as expected — that part of the
 intuition is right, and it is worth being explicit about the size of the effect:
@@ -346,8 +346,34 @@ picked `t_land = BurnTime` here: on the nominal trajectory the freedom is not
 needed, it is there for when a disturbance means the old problem would have had
 no answer at all.
 
-**Not yet measured**: a full ignition-altitude sweep and a mid-burn restart
-sweep with both switches on. `Examples/FeasibilitySweep.jl` runs them.
+Restarting part way through the burn — the case the MPC actually depends on,
+and the one that used to throw `SingularException` on all 20 attempts — now
+solves every time, with the touchdown time doing visibly useful work:
+
+| restart | `t_land` | `min‖T‖` | `h_end` | touchdown |
+|---|---|---|---|---|
+| `t0 = 1.5 s`, on the nominal | 3.450 | 1.0000 | 0.000 | 0.17 m/s |
+| `t0 = 1.5 s`, 0.5 m low | **2.913** | 1.0000 | 0.000 | 1.90 m/s |
+| `t0 = 1.5 s`, 0.5 m high | 3.450 | 1.0000 | 0.000 | 1.43 m/s |
+| `t0 = 1.5 s`, 2 m low | **2.316** | 1.0000 | 0.000 | 3.96 m/s |
+| `t0 = 1.5 s`, 2 m high | 3.450 | 1.0000 | 0.000 | 3.70 m/s |
+| `t0 = 2.5 s`, on the nominal | 3.447 | 1.0000 | 0.000 | 0.51 m/s |
+| `t0 = 2.5 s`, 0.5 m low | **2.897** | 1.0000 | 0.000 | 1.84 m/s |
+| `t0 = 2.5 s`, 0.5 m high | 3.450 | 1.0000 | 0.000 | 1.87 m/s |
+| `t0 = 2.5 s`, 2 m low | **2.550** | 1.0000 | 0.000 | 2.89 m/s |
+| `t0 = 2.5 s`, 2 m high | 3.450 | 1.0000 | 0.000 | 6.27 m/s |
+
+10/10 solved. Note the asymmetry: when the vehicle is **low** the optimiser
+shortens the burn (2.32–2.91 s instead of 3.45 s) and lands early, which is
+precisely the recourse the fixed-touchdown problem did not have. When it is
+**high** `t_land` stays pinned at `BurnTime` and all it can do is arrive faster
+— because the horizon cannot be extended past burnout. The paper's own
+formulation allows `b ≥ burn time`, i.e. a ballistic tail after the motor is
+spent; adding that would cover the "too high" half of the disturbance set the
+same way. That is the obvious next step.
+
+**Not yet measured**: a full ignition-altitude sweep with both switches on.
+`Examples/FeasibilitySweep.jl` runs it.
 
 ## 4. Bugs found
 
