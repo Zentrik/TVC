@@ -139,11 +139,13 @@ In rough order of value for effort:
    Every failing case inspected had one: e.g. `h0 = 16 m` reports
    `SCP_FAILED (NUMERICAL_ERROR)` but iteration 2 has `J = 7.07e-3` and
    `max|vd| = 4.1e-3`, which is a perfectly good landing trajectory.
-2. **Stop iterating earlier.** The failing solves fail on the iteration *after*
-   they have effectively converged, so a looser `ε_rel` (`1e-2` rather than
-   `1e-3`) should avoid a good fraction of them, and for MPC there is no value
-   in the last 1% of cost. Worth measuring on your machine — the failure point
-   depends on the exact ECOS build.
+2. **Do not expect the PTR tolerances to save you.** Stopping before the bad
+   subproblem sounds attractive, but the convergence test cannot see it coming:
+   on the iteration *before* the failure the relative cost improvement is
+   96–99.8% and the deviation is ~6e-2, nowhere near `ε_rel = 1e-3` or
+   `ε_abs = 1e-5`. Rerunning the sweep with `ε_rel = 1e-2` changes essentially
+   nothing (12/21 solved either way). The knob that works is (1): take the last
+   safe iterate rather than trying to stop on one.
 3. **Judge the solution on `vd`/`vbc`, not on the status string.** `SCP_SOLVED`
    only means "the last subproblem solved" — it is set even when PTR ran out
    of iterations with large virtual controls, i.e. when the returned trajectory
