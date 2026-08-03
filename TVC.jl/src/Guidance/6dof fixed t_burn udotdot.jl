@@ -70,7 +70,11 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     advise!(pbm, :input, 1, (-deg2rad(10), deg2rad(10)))
     advise!(pbm, :input, 2, (-deg2rad(10), deg2rad(10)))
     advise!(pbm, :input, 3, (-deg2rad(10), deg2rad(10)))
-    advise!(pbm, :input, 4, (-1.0, 1.0))
+    advise!(pbm, :input, 4, (-0.1, 0.1)) # was (-1, 1), but the roll torque
+    # constraint is |u4| <= 0.1, so the scaled variable only ever used a tenth
+    # of its range. That matters more here than anywhere else: 1/I_zz is 4036
+    # rad/(N m s), so an absolute solver tolerance in scaled units turns into
+    # ten times more roll rate than it should.
 
     # Parameters
     advise!(pbm, :parameter, 1, (0.0, 10.0))

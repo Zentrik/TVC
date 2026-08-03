@@ -418,15 +418,52 @@ guidance does not model and only re-planned every 0.25 s, arrives early anyway.
 `faster horizontal` is 0.59 s early at 9 m/s and 16° of tilt — a crash, not a
 landing.
 
-**One thing to look at that is not authority.** Touchdown `‖ω‖` is 10.0 rad/s on
-`5 m lower` and 4.6 on `faster horizontal`, on flights that are otherwise
-upright — the guidance constrains `ω = 0` at the terminal node, so something is
-diverging near the end. The prime suspect is roll: `I_zz = 2.48e-4` against
-`I_xx = I_yy = 8.27e-2`, and the roll torque limit of 0.1 N·m buys ~400 rad/s²,
-so a roll command sampled from a plan every 0.25 s has enormous rate error for
-very little timing mismatch. This has not been confirmed — the sweep reports
-`‖ω‖` and not its components. Worth instrumenting before reading anything else
-into it.
+**One thing that is not authority: the roll rate.** Touchdown `‖ω‖` is 10.0 rad/s
+on `5 m lower` and 4.6 on `faster horizontal`, on flights that are otherwise
+upright. Splitting it by axis settles what it is:
+
+| case | `ω_x` | `ω_y` | `ω_z` (roll) | transverse |
+|---|---|---|---|---|
+| 5 m lower | −0.00 | −0.14 | **−10.04** | 0.14 |
+| faster horizontal | 0.64 | −0.63 | **4.53** | 0.90 |
+| released tilted 5° | −0.14 | 0.05 | **−1.42** | 0.15 |
+
+Pitch and yaw are well controlled — transverse rates are 0.14–0.90 rad/s. It is
+all roll, and it is entirely self inflicted:
+
+* **There are no roll disturbances in this model at all.** The gimbal cannot
+  produce roll torque — `MomentArm = [0; 0; −d]`, and `cross([0,0,−d], F)` has an
+  identically zero z component for any thrust vector. Aero cannot either:
+  `Croll = 0` in `PitchNormalCD`, and `ThetaRotation` is a rotation about z whose
+  third row is `[0 0 1]`. And with `I_xx = I_yy` the gyroscopic term
+  `(ω × Iω)_z = (I_yy − I_xx) ω_x ω_y` vanishes. So `ω̇_z = u₄ / I_zz` exactly:
+  every bit of roll rate at touchdown was *commanded*.
+* **The commanded torque is at solver noise level, and that is enough.** On the
+  nominal solve `max|u₄| = 7.9e-4 N·m` — 0.79% of the 0.1 N·m limit, invisible
+  unless you print it in scientific notation. But `1/I_zz = 4036 rad/(N·m·s)`, so
+  1e-4 N·m held for a second is 0.4 rad/s. The 10.04 rad/s observed needs an
+  impulse of just 2.5e-3 N·m·s, i.e. 7e-4 N·m averaged over the flight.
+* **Nothing asks for `u₄` to be small.** There is no running cost on the input at
+  all (`set_cost!` sets only a terminal cost on velocity), and the `‖ω‖ ≤ π/2`
+  path constraint is commented out. The only thing pinning roll is `ω_z = 0` at
+  the plan's *terminal* node — and in closed loop the vehicle never gets there,
+  because the plan is replaced every 0.25 s. Each plan's roll correction lives in
+  a tail that is never executed, so `ω_z` random walks on the uncorrected heads.
+  The measured profile shows exactly this shape: `~1e-5` early, growing to
+  `−4.3e-4, 6.9e-4, −7.9e-4` over the last three nodes.
+* **The input scaling made it ten times worse than necessary** (fixed).
+  `advise!(pbm, :input, 4, (-1.0, 1.0))` against a constraint of `|u₄| ≤ 0.1`
+  meant the scaled variable only ever used a tenth of its range, so an absolute
+  tolerance in scaled units mapped to ten times more physical torque. This is the
+  same 4000× scale mismatch §1 lists as a conditioning problem, showing up as a
+  physical symptom.
+
+The scaling fix lowers the noise floor but is not a cure. If roll rate at
+touchdown matters, the fixes are a running cost on the input (so `u₄` is driven
+to zero rather than left wherever the solver stops), reinstating a bound on `‖ω‖`,
+or simply closing a proportional rate loop on roll in the controller instead of
+tracking the planned torque open loop — 404 rad/s² makes that trivial. None of
+these are measured yet.
 
 ## 5. Bugs found
 
