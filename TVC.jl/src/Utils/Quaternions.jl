@@ -34,18 +34,27 @@ function skew(w)
 end
 
 function wexp(w, approx=false)
-    theta = norm(w)
-
     if approx
         t = Taylor1(Float64, 20)
-        return evaluate([cos(t / 2); [1; 1; 1] * eps() * sin(t / 2) / t], theta)
+        return evaluate([cos(t / 2); [1; 1; 1] * eps() * sin(t / 2) / t], norm(w))
     end
 
-    if theta < eps()
-        return [1; 0; 0; 0] # code will break here
+    # Written in terms of θ² = w ⋅ w rather than θ = norm(w) so that it stays
+    # smooth (and ForwardDiff differentiable) at w = 0. `norm` is not
+    # differentiable there — it returns a NaN partial — and the old `theta <
+    # eps()` early return produced a *constant*, so `ForwardDiff.derivative` of
+    # anything wrapping `wexp` silently evaluated to zero whenever it was
+    # evaluated at w = 0. That is exactly the case hit by the coast-time
+    # Jacobian in the guidance problem, whose reference value of t_coast is 0.
+    thetasq = dot(w, w)
+
+    if thetasq < 1e-12 # series expansions of cos(θ/2) and sin(θ/2)/θ in θ²
+        return [1 - thetasq / 8 + thetasq^2 / 384; w * (1/2 - thetasq / 48 + thetasq^2 / 3840)]
     end
 
-    return [cos(theta / 2); w / theta * sin(theta / 2)]
+    theta = sqrt(thetasq)
+
+    return [cos(theta / 2); w * (sin(theta / 2) / theta)]
 end
 
 function wexp_w(w)
@@ -86,13 +95,15 @@ function slerp(v, w, frac)
 end
 
 #interpolates from v to w by frac ∈ [0, 1]
-function slerp_quat(q0, q1, frac) 
+function slerp_quat(q0, q1, frac)
     Δq = quatL(conjugate(q0)) * q1 # quaternion rotating q0 to q1
     # Δq_t = wexp(frac * quatLog(Δq)[2:4])
-    
-    axis, angle = quatLogAxisAngle(Δq)
 
-    Δq_t = [cos(angle); sin(angle) * axis]
+    axis, angle = quatLogAxisAngle(Δq) # angle is the half angle, i.e. Δq = [cos(angle); sin(angle) * axis]
+
+    # `frac` used to be missing here, so this returned normalize(q1) for every
+    # value of `frac`, i.e. it was not an interpolation at all.
+    Δq_t = [cos(frac * angle); sin(frac * angle) * axis]
     qt = quatL(q0) * Δq_t
 
     return qt

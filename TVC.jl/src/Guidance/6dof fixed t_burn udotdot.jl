@@ -60,7 +60,7 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     advise!(pbm, :state, 10, (-1.0, 1.0))
     advise!(pbm, :state, 11, (-10.0, 10.0))
     advise!(pbm, :state, 12, (-10.0, 10.0))
-    advise!(pbm, :state, 13, (-10.0, 00.0))
+    advise!(pbm, :state, 13, (-10.0, 10.0)) # was (-10.0, 0.0), which is a typo: ω_z is not sign definite
 
     advise!(pbm, :state, 14, (-1.0, 1.0))
     advise!(pbm, :state, 15, (-1.0, 1.0))
@@ -127,10 +127,17 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
             
             u = straightline_interpolate([0; 0; 0; 0], [0; 0; 0; 0], N)
             
+            # Roll is left at whatever q0 has, only the tilt is interpolated out.
+            # This has to be normalised: [q0[1]; qN[2:3]; q0[4]] has norm < 1
+            # whenever the rocket is tilted, and a non unit reference quaternion
+            # makes the linearised dynamics inconsistent (see the TODO at the
+            # top of this file).
+            quatN = normalize([traj.q0[1]; traj.qN[2:3]; traj.q0[4]])
+
             for k = 1:N
                 mix = (k - 1) / (N - 1)
-                
-                x[veh.id_quat, k] = slerp_quat(traj.q0, [traj.q0[1]; traj.qN[2:3]; traj.q0[4]], mix)
+
+                x[veh.id_quat, k] = slerp_quat(traj.q0, quatN, mix)
             end
         end
 
