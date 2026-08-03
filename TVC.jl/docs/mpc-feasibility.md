@@ -36,15 +36,35 @@ Plus a handful of concrete bugs (listed at the end) that make (1) much worse.
 Sweeping only the ignition altitude and leaving everything else at the
 defaults (`r0 = [20, -4, h]`, `v0 = [4, -3, 0]`, everything else zero):
 
-| `h0` (m) | 18 | 20 | 22 | 24 | 26 | 28 | 30 | 32 | 34 |
-|---|---|---|---|---|---|---|---|---|---|
-| result | FAIL | FAIL | FAIL | FAIL | ok | FAIL | ok | ok | ok |
+| `h0` (m) | result | iterations | best iterate PTR had |
+|---|---|---|---|
+| 16 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 7.07e-3`, `max\|vd\| = 4.1e-3` |
+| 17 | `SCP_SOLVED` | 14 | #14, `J = 4.13e-6` |
+| 18 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 1.67e-3`, `max\|vd\| = 2.8e-3` |
+| 19 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 1.14e-3` |
+| 20 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 8.22e-4` |
+| 21 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 6.57e-4` |
+| 22 | **`SingularException(3)` thrown** | – | – |
+| 23 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 4.08e-4` |
+| 24 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 3.31e-4` |
+| 25 | `SCP_FAILED (NUMERICAL_ERROR)` | 3 | #2, `J = 2.82e-4` |
+| 26 | `SCP_SOLVED` | 5 | #5, `J = 5.9e-12` |
+| 27 | `SCP_SOLVED` | 7 | #7, `J = 3.7e-11` |
+| 28 | `SCP_SOLVED` | 30 | #30, `J = 1.11e-2` |
+| 29–33 | `SCP_SOLVED` | 5–9 | `J = 0.099 … 1.31` |
 
-Solvability is not monotone in the initial condition, and it is not even
-correlated with how hard the landing is: `h0 = 26 m` lands with a residual
-speed of 0.005 m/s, and `h0 = 24 m` — a strictly easier problem — fails.
-Nothing physical distinguishes 26 m from 28 m. That non-monotonicity is the
-signature of a numerical breakdown rather than an infeasible problem.
+Two things stand out. The failures are *not* the hard problems — the reported
+cost of the discarded iterate on the failing cases (`1e-4` to `7e-3`, i.e. a
+1–8 cm/s touchdown) is far better than that of several cases that succeed
+(`h0 = 30 m` converges happily to `J = 0.274`, a 0.52 m/s touchdown). And the
+iteration count is erratic: 3, 14, 3, 3, …, 5, 7, 30, 9. Neither pattern is
+what an infeasible or a marginally feasible problem looks like; both are what
+a conic solver falling over looks like.
+
+(This is with the three bugs at the bottom of this page fixed. Before the
+fixes the same sweep failed at 18, 20, 22, 24, 28 and succeeded at 26, 30, 32,
+34, which is less monotone but has the same character. The bugs are worth
+fixing, but they are not what makes the solve fail.)
 
 ### What actually happens
 
