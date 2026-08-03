@@ -451,10 +451,36 @@ steering effector and it uses it: at `ω_z = 5.9 rad/s` the transverse rate vect
 makes a full turn in about a second. Remove that channel and the plan is no
 longer executable, which is exactly what the rate loop did.
 
-So the roll rate at touchdown is a side effect of steering, not garbage. It may
-still be unwanted at contact — 570°/s is a lot to land on — but it cannot simply
-be nulled. If it needs to be bounded, it has to be bounded *inside the guidance
-problem*, where the optimiser can trade it against the steering it buys.
+So the roll rate at touchdown is a side effect of steering, not garbage. It is
+still unwanted at contact — 570°/s is a lot to land on — but neither obvious
+cure works:
+
+| nominal / `5 m lower` | touchdown `‖v‖` | tilt | roll |
+|---|---|---|---|
+| track the planned `u₄` open loop | 3.36 / 1.74 m/s | 0.1° / 0.8° | 0.03 / **10.04** |
+| controller drives `ω_z → 0` | 22.64 / 17.85 m/s | **76.2°** / **125.6°** | 0.00 / 0.00 |
+| guidance bound `\|ω_z\| ≤ 2 rad/s` | 18.10 / 15.30 m/s | **72.4°** / **85.4°** | −4.08 / −5.37 |
+| **feedforward + rate error feedback** | **4.54 / 2.06 m/s** | **1.7° / 1.1°** | **0.02 / −0.34** |
+
+Both cures fail the same way, by taking the effector away. Note also that
+bounding `ω_z ≤ 2` in the guidance does not even achieve its own goal — the
+vehicle still ends at 4–5 rad/s, because the bound applies to the *plan*, which
+the controller was not following in the first place.
+
+What works is the third option, and it is what the plan was always asking for.
+The plan's `ω_z` is what its steering needs *and it ends at zero*, so rather than
+overriding it, track it:
+
+```julia
+roll = clamp(planned_u₄ + RollRateGain * I_zz * (planned_ω_z − measured_ω_z),
+             −0.1, 0.1)
+```
+
+The feedforward keeps the effector; the feedback term makes the vehicle actually
+arrive with the roll the plan intended. `5 m lower` goes from 10.04 rad/s of roll
+at touchdown to −0.34, and stops reaching the ground 0.06 s *before* burnout. The
+cost is a slower touchdown on the nominal case (3.36 → 4.54 m/s), which has not
+been separated from the run-to-run spread of these flights.
 
 Two corrections to earlier readings on this page, recorded because they were both
 plausible and both wrong: the `1e-4`–`1e-3` roll torque measured on the nominal
