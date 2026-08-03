@@ -59,6 +59,8 @@ function fly(label, traj0; veh = RocketParameters(), mpcΔt = 0.25, dt = 0.002)
         else
             dir = zeros(3); roll = 0.0
         end
+
+
         F = dir * veh.Thrust(tₘ)
         return (force = F, torque = veh.MomentArm(tₘ) × F + [0; 0; roll])
     end

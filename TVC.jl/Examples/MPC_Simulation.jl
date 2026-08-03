@@ -63,6 +63,7 @@ function control(x, p, t)
         desired_roll = 0.
     end
 
+
     return Actuator(x, p, t, desired_tvc, desired_roll)
 end
 

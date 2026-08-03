@@ -478,11 +478,43 @@ units the roll column of `B` is ~139 against O(1) for every other channel, so
 roll is where the solver's residual lands. You cannot cost your way out of it.
 
 So the running cost is worth keeping for what it actually does — a smoother
-gimbal command, and the input is no longer a formally degenerate direction — but
-the roll fix has to be elsewhere. **Close a proportional rate loop on roll in the
-controller** instead of tracking the planned `u₄` open loop: with 404 rad/s²
-available it nulls rad/s of roll in milliseconds, and it does not care what the
-guidance thinks. That is not implemented yet.
+gimbal command, and the input is no longer a formally degenerate direction.
+
+### A roll rate loop in the controller does not work, and it is not obvious why
+
+The natural next step is to stop tracking the planned `u₄` and regulate roll
+directly: `ω̇_z = u₄/I_zz` with no disturbance of any kind, so proportional
+feedback on the rate is a first order system, no integral or derivative term
+called for, and 404 rad/s² nulls rad/s of roll in milliseconds. One line.
+
+It was tried (`u₄ = clamp(−10 I_zz ω_z, ±0.1)`) and it is a **catastrophic
+regression**, on every case:
+
+| case | without the loop | with the loop |
+|---|---|---|
+| nominal | 3.36 m/s, 0.1° tilt, roll 0.03, transverse 0.00 | 22.64 m/s, 76.2° tilt, roll −0.00, transverse 6.86 |
+| 5 m lower | 1.74 m/s, 0.8° tilt | 17.85 m/s, **125.6°** tilt, roll 0.00, transverse 5.17 |
+| released tilted 5° | 4.64 m/s, 11.9° tilt | 20.92 m/s, 64.6° tilt, roll −0.00, transverse 7.23 |
+
+The loop does exactly what it was asked to: roll is nulled to 0.00 in all three.
+But the vehicle tumbles in *pitch and yaw*, with 5–7 rad/s of transverse rate,
+and reaches the ground 1.2 s early.
+
+This was isolated — the run labelled "without the loop" above has the running
+cost, the input rescaling and the `‖ω‖` bound all switched on, and differs from
+the bad run *only* by the roll command. So it is the loop, not the guidance
+changes.
+
+**The mechanism is not understood.** The obvious candidate — the plan expresses
+`T` in the body frame, so suppressing roll desynchronises the body roll angle
+from the plan and points the transverse thrust the wrong way in inertial space —
+does not survive arithmetic: the plan's own `ω_z` peaks at 0.14 rad/s, which is
+2° of drift over one 0.25 s replan interval, and the guidance re-solves from the
+*measured* attitude every tick anyway. Something else is going on. Until it is
+understood the loop stays out; the controller tracks the planned `u₄` as before.
+
+This is worth chasing, because the reasoning behind the loop still looks sound
+and the thing it was meant to fix is real.
 
 The `‖ω‖` bound is back, as `MaxAngularVelocity`, defaulting to 2π rad/s and
 applied from node 2 onward — node 1 is pinned to the measured state by the
