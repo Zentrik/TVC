@@ -34,8 +34,14 @@ export RocketParameters
     # Set this to true to force touchdown to happen exactly at burnout, which is
     # what the guidance problem used to require. With no throttle that leaves it
     # with almost nothing to steer the terminal altitude constraint with, so by
-    # default the touchdown time is a decision variable bounded by BurnTime.
+    # default the touchdown time is a decision variable and the rocket is allowed
+    # to fall ballistically once the motor is spent.
     FixedLandingTime::Bool = false
+
+    # How long after burnout the guidance will plan an unpowered fall for.
+    # Touchdown is never allowed before BurnTime: thrust to weight is ~1.35, so
+    # a rocket that reaches the ground under thrust takes off again.
+    MaxBallisticTime = 2.0
 
     Mass::Any = Mass
     Thrust::Any = Thrust

@@ -31,6 +31,19 @@
 
 export solveProblem, lastUsableSolution
 
+"""
+    gridSize(mdl)
+
+Number of discretisation nodes. Sized for the longest horizon the problem is
+allowed to choose — burn time plus the ballistic tail — because the grid is
+uniform in normalised time.
+"""
+function gridSize(mdl)
+    horizon = mdl.veh.BurnTime + (mdl.veh.FixedLandingTime ? 0. : mdl.veh.MaxBallisticTime) - mdl.traj.t0
+
+    return max(floor(Int, horizon / 0.4) + 2, 5)
+end
+
 using Clarabel # ECOS reports NUMERICAL_ERROR on a large fraction of these
                # problems, and sometimes returns an all NaN solution while
                # still reporting ALMOST_OPTIMAL. See docs/mpc-feasibility.md.
@@ -76,7 +89,10 @@ function ptr(mdl)
     pbm = TrajectoryProblem(mdl)
     define_problem!(pbm, :ptr)
 
-    N, Nsub = max(floor(Int, (mdl.veh.BurnTime - mdl.traj.t0) / 0.4) + 2, 5), 100 # dt can be set to 0.2 or even higher with little decrease in cost (velocity will only be a bit higher).
+    # Sized for the longest horizon the problem can pick, since the grid is
+    # uniform in normalised time: if t_land stretches into the ballistic tail,
+    # a grid sized for the burn alone would thin out over the powered phase too.
+    N, Nsub = gridSize(mdl), 100 # dt can be set to 0.2 or even higher with little decrease in cost (velocity will only be a bit higher).
     # N can't be ≤ 1?
     iter_max = 50
     disc_method = FOH
@@ -114,7 +130,7 @@ function scvx(mdl)
     define_problem!(pbm, :scvx)
 
     # PTR algorithm parameters
-    N, Nsub = max(floor(Int, (mdl.veh.BurnTime - mdl.traj.t0) / 0.4) + 2, 5), 100 # dt can be set to 0.2 or even higher with little decrease in cost (velocity will only be a bit higher).
+    N, Nsub = gridSize(mdl), 100
     iter_max = 50
     disc_method = FOH
     λ = 5e2

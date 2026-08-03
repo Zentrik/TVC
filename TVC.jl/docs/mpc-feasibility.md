@@ -234,11 +234,10 @@ what produced the rigidity — see §3.
 
 ### Suggested changes
 
-* **Make the touchdown time free.** Add a second parameter `t_land` and scale
-  the dynamics by it, exactly as the coast time is handled now, with
-  `t_land ≤ BurnTime`. This restores the free variable the paper's formulation
-  has, and is the only thing that gives a mid-burn re-solve real authority once
-  the throttle is gone.
+* **Make the touchdown time free** (done, see §3). A second parameter `t_land`
+  scales the dynamics exactly as the coast time does, bounded *below* by
+  `BurnTime` so the rocket falls ballistically to the ground rather than
+  arriving under thrust.
 * **Fall back gracefully.** As `t0 → BurnTime` the horizon and the authority
   both go to zero and re-solving is pointless. Stop re-planning below some
   remaining-burn threshold and fly the last good plan.
@@ -323,15 +322,25 @@ that part of the plan away.
   infeasible. Together with the existing cone this pins `‖T‖ = 1`. Set it to
   `true` to get the old relaxation back.
 * `FixedLandingTime = false` promotes the touchdown time to a decision variable
-  `p[veh.id_tland] ∈ [t0 + MinimumHorizon, BurnTime]`, and the trajectory is
-  scaled to that horizon rather than to burnout.
+  `p[veh.id_tland] ∈ [BurnTime, BurnTime + MaxBallisticTime]`, and the
+  trajectory is scaled to that horizon rather than to burnout. Past `BurnTime`
+  the thrust table returns 0 and the mass and CG tables are flat, so the same
+  dynamics carry straight on as an unpowered fall — no extra modelling needed.
+
+  Touchdown is **not** allowed before burnout. Thrust to weight is ~1.35 for
+  most of the burn, so a rocket that reaches the ground while still thrusting
+  bounces and flies again; the paper counts that as a failed landing, and
+  `height ≥ 0` at every node is what holds the trajectory up until the motor is
+  spent.
 
 The second is what pays for the first. Requiring touchdown *exactly* at burnout
 was only tractable because the throttle was there to absorb the terminal
 altitude constraint; with the throttle gone the constraint has nothing to work
-with, which is what §2 is about. A free touchdown time is the knob the paper's
-own formulation has, it is physically meaningful, and unlike the throttle the
-vehicle can actually deliver it.
+with, which is what §2 is about. Allowing a ballistic tail turns "be exactly at
+the ground the instant the motor cuts out" into "be above the ground at cutout
+and fall the rest of the way" — the condition the paper's `b ≥ burn time`
+expresses, physically meaningful, and unlike the throttle something the vehicle
+can actually deliver.
 
 On the nominal ignition state the two switches together give
 
@@ -348,29 +357,27 @@ no answer at all.
 
 Restarting part way through the burn — the case the MPC actually depends on,
 and the one that used to throw `SingularException` on all 20 attempts — now
-solves every time, with the touchdown time doing visibly useful work:
+solves every time:
 
 | restart | `t_land` | `min‖T‖` | `h_end` | touchdown |
 |---|---|---|---|---|
-| `t0 = 1.5 s`, on the nominal | 3.450 | 1.0000 | 0.000 | 0.17 m/s |
-| `t0 = 1.5 s`, 0.5 m low | **2.913** | 1.0000 | 0.000 | 1.90 m/s |
-| `t0 = 1.5 s`, 0.5 m high | 3.450 | 1.0000 | 0.000 | 1.43 m/s |
-| `t0 = 1.5 s`, 2 m low | **2.316** | 1.0000 | 0.000 | 3.96 m/s |
-| `t0 = 1.5 s`, 2 m high | 3.450 | 1.0000 | 0.000 | 3.70 m/s |
-| `t0 = 2.5 s`, on the nominal | 3.447 | 1.0000 | 0.000 | 0.51 m/s |
-| `t0 = 2.5 s`, 0.5 m low | **2.897** | 1.0000 | 0.000 | 1.84 m/s |
-| `t0 = 2.5 s`, 0.5 m high | 3.450 | 1.0000 | 0.000 | 1.87 m/s |
-| `t0 = 2.5 s`, 2 m low | **2.550** | 1.0000 | 0.000 | 2.89 m/s |
-| `t0 = 2.5 s`, 2 m high | 3.450 | 1.0000 | 0.000 | 6.27 m/s |
+| `t0 = 1.5 s`, on the nominal | 3.450 | 1.0000 | 0.000 | 0.52 m/s |
+| `t0 = 1.5 s`, 0.5 m low | 3.450 | 1.0000 | 0.000 | 1.31 m/s |
+| `t0 = 1.5 s`, 0.5 m high | 3.450 | 1.0000 | 0.000 | 1.10 m/s |
+| `t0 = 1.5 s`, 2 m low | **3.784** | 1.0000 | 0.000 | 2.72 m/s |
+| `t0 = 1.5 s`, 2 m high | 3.450 | 1.0000 | 0.000 | 2.82 m/s |
+| `t0 = 2.5 s`, on the nominal | 3.450 | 1.0000 | 0.000 | 0.52 m/s |
+| `t0 = 2.5 s`, 0.5 m low | 3.450 | 1.0000 | 0.000 | 0.52 m/s |
+| `t0 = 2.5 s`, 0.5 m high | **3.720** | 1.0000 | 0.000 | 3.17 m/s |
+| `t0 = 2.5 s`, 2 m low | 3.450 | 1.0000 | 0.000 | 0.52 m/s |
+| `t0 = 2.5 s`, 2 m high | **4.037** | 1.0000 | 0.000 | 6.28 m/s |
 
-10/10 solved. Note the asymmetry: when the vehicle is **low** the optimiser
-shortens the burn (2.32–2.91 s instead of 3.45 s) and lands early, which is
-precisely the recourse the fixed-touchdown problem did not have. When it is
-**high** `t_land` stays pinned at `BurnTime` and all it can do is arrive faster
-— because the horizon cannot be extended past burnout. The paper's own
-formulation allows `b ≥ burn time`, i.e. a ballistic tail after the motor is
-spent; adding that would cover the "too high" half of the disturbance set the
-same way. That is the obvious next step.
+10/10 solved, every one touching down at zero altitude with `‖T‖ = 1` — no
+phantom throttle anywhere. Most cases still land exactly at burnout, which is
+the right answer when the state allows it. The bolded rows are the ones that
+use the ballistic tail: 0.27–0.59 s of unpowered fall, which is what makes a
+state that cannot reach the ground by burnout solvable at all instead of
+leaving the terminal altitude constraint with no answer.
 
 **Not yet measured**: a full ignition-altitude sweep with both switches on.
 `Examples/FeasibilitySweep.jl` runs it.

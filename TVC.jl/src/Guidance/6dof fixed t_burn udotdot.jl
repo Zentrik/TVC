@@ -74,7 +74,7 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
 
     # Parameters
     advise!(pbm, :parameter, 1, (0.0, 10.0))
-    advise!(pbm, :parameter, 2, (0.0, pbm.mdl.veh.BurnTime))
+    advise!(pbm, :parameter, 2, (0.0, pbm.mdl.veh.BurnTime + pbm.mdl.veh.MaxBallisticTime))
 
     return nothing
 end
@@ -438,22 +438,35 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
             if veh.FixedLandingTime
                 fixParameter!(ocp, pbm, veh.id_tland, veh.BurnTime)
             else
-                # t0 + MinimumHorizon ≤ t_land ≤ BurnTime. The motor cannot be
-                # relit and `veh.Thrust` is 0 past BurnTime, so there is nothing
-                # to plan with beyond it; the lower bound just keeps the horizon
-                # (and hence the scaled dynamics) away from zero.
+                # BurnTime ≤ t_land ≤ BurnTime + MaxBallisticTime.
+                #
+                # Touchdown must not happen before the motor is spent. Thrust to
+                # weight is about 1.35 for most of the burn, so a rocket that
+                # reaches the ground while still thrusting bounces and flies
+                # again — it is a crash, not a landing, and the paper counts it
+                # as a failure. `height >= 0` at every node is what keeps the
+                # trajectory above the ground until then.
+                #
+                # Past BurnTime `veh.Thrust` is 0 and `veh.Mass` and `veh.CG` are
+                # flat, so the same dynamics carry on as an unpowered ballistic
+                # fall with no further modelling needed. That tail is the point:
+                # it turns "be exactly at the ground the instant the motor cuts
+                # out" into "be above the ground at cutout and fall the rest of
+                # the way", which is a condition an off nominal state can
+                # actually meet.
                 @add_constraint(
-                    ocp, NONPOS, "t_land <= BurnTime", (p[veh.id_tland],), begin
+                    ocp, NONPOS, "t_land >= BurnTime", (p[veh.id_tland],), begin
                         local t_land = arg[1]
-                        t_land - veh.BurnTime
+                        # `max` so the horizon stays positive even if we are
+                        # somehow re-planning past burnout.
+                        max(veh.BurnTime, traj.t0 + MinimumHorizon) - t_land
                     end)
 
                 @add_constraint(
-                    ocp, NONPOS, "t_land >= t0 + minimum horizon", (p[veh.id_tland],), begin
+                    ocp, NONPOS, "t_land <= BurnTime + max ballistic time",
+                    (p[veh.id_tland],), begin
                         local t_land = arg[1]
-                        # `min` so this can never contradict the bound above,
-                        # however little burn time is left.
-                        min(traj.t0 + MinimumHorizon, veh.BurnTime) - t_land
+                        t_land - (veh.BurnTime + veh.MaxBallisticTime)
                     end)
             end
 
