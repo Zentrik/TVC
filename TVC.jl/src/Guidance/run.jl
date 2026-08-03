@@ -29,11 +29,47 @@
 #     return sol
 # end
 
-export solveProblem
+export solveProblem, lastUsableSolution
 
-# using MOI
-using ECOS
+using Clarabel # ECOS reports NUMERICAL_ERROR on a large fraction of these
+               # problems, and sometimes returns an all NaN solution while
+               # still reporting ALMOST_OPTIMAL. See docs/mpc-feasibility.md.
+# using ECOS
 # using Gurobi
+
+import JuMP: MOI
+
+"""
+    lastUsableSolution(hist)
+
+Rebuild an `SCPSolution` from the last PTR iteration whose conic subproblem
+actually solved, or return `nothing` if there wasn't one.
+
+`SCPToolbox` decides between `SCP_SOLVED` and `SCP_FAILED` by looking only at
+the *last* subproblem, so one bad solve at the end discards every good iterate
+before it — even though those are usually perfectly good trajectories. For a
+controller that has to produce something every 0.25 s that is the wrong trade.
+
+Also rejects non finite solutions: a subproblem can come back `ALMOST_OPTIMAL`
+with a solution vector full of `NaN`, and `SCPToolbox` will happily
+re-discretise about it (which is where the `SingularException`s come from).
+"""
+function lastUsableSolution(hist::SCPHistory)
+    for subproblem in reverse(hist.subproblems)
+        sol = subproblem.sol
+
+        if (sol.status == MOI.OPTIMAL || sol.status == MOI.ALMOST_OPTIMAL) &&
+           all(isfinite, sol.xd) && all(isfinite, sol.ud) && all(isfinite, sol.p)
+            # SCPSolution takes the history and looks at its last entry, so hand
+            # it a history truncated to this iteration.
+            truncated = SCPHistory(hist.subproblems[1:subproblem.iter])
+
+            return SCPSolution(truncated)
+        end
+    end
+
+    return nothing
+end
 
 function ptr(mdl)
     # Problem definition
@@ -44,12 +80,13 @@ function ptr(mdl)
     # N can't be ≤ 1?
     iter_max = 50
     disc_method = FOH
-    wvc, wtr = 5e3, 1e-2 # wtr is important, needs to be small but too small and we get problems. 
+    wvc, wtr = 5e3, 1e-2 # wtr is important, needs to be small but too small and we get problems.
     feas_tol = 1e-2
     ε_abs, ε_rel = 1e-5, 1e-3
     q_tr = Inf
     q_exit = Inf
-    solver, options = ECOS, Dict("verbose"=>0)
+    solver, options = Clarabel, Dict("verbose"=>false)
+    # solver, options = ECOS, Dict("verbose"=>0)
     # MOI.Silent()
     # solver, options = Gurobi, Dict()#"OutputFlag"=>0)
     pars = PTR.Parameters(
@@ -59,9 +96,16 @@ function ptr(mdl)
     # Create and solve the problem
     ptr_pbm = PTR.create(pars, pbm)
     sol, hist = PTR.solve(ptr_pbm)
+
+    if startswith(sol.status, string(SCP_FAILED))
+        salvaged = lastUsableSolution(hist)
+
+        if !isnothing(salvaged)
+            return salvaged
+        end
+    end
+
     return sol
-    # value(hist.subproblems[1].vd)
-    # return sol
 end
 
 function scvx(mdl)

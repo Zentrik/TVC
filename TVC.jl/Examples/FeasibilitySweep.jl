@@ -9,6 +9,9 @@
         always already produced a usable trajectory on an earlier iteration.
       * `verticalAuthority` shows how little of the terminal altitude
         constraint the guidance can still influence once the motor is lit.
+      * `min‖T‖` in the summary lines is the tell for whether `‖T‖ ≤ 1` came
+        out tight. Anything below 1 is a throttle setting a solid motor cannot
+        produce, i.e. the relaxation was lossy and the plan is not flyable.
 =#
 
 using TVC, SCPToolbox, LinearAlgebra, Printf, ECOS
@@ -57,8 +60,12 @@ function summarise(label, mdl; kwargs...)
         solutions = [subproblem.sol for subproblem in hist.subproblems]
         k = lastSafeIterate(hist)
 
-        @printf("  %-28s %-26s iterations = %2d, last usable iterate = %s\n",
-                label, sol.status, length(solutions),
+        thrustMagnitude = isnothing(k) ? NaN :
+            minimum(norm(solutions[k].xd[mdl.veh.id_T, j])
+                    for j = 1:size(solutions[k].xd, 2))
+
+        @printf("  %-28s %-26s iterations = %2d, min‖T‖ = %.4f, last usable iterate = %s\n",
+                label, sol.status, length(solutions), thrustMagnitude,
                 isnothing(k) ? "none" :
                 @sprintf("%d (J = %.3e, max|vd| = %.1e, max|vbc| = %.1e)",
                          k, solutions[k].J, maximum(abs, solutions[k].vd),
@@ -75,13 +82,13 @@ end
 #   Solvability is not monotone in the initial condition
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
-function statusSweep(; heights=16.0:1.0:36.0, kwargs...)
+function statusSweep(; heights=16.0:1.0:36.0, vehicle=veh, kwargs...)
     statuses = String[]
 
     for height in heights
         traj = RocketTrajectoryParameters(r0=[20.0, -4.0, height])
         push!(statuses, summarise(@sprintf("h0 = %.0f m", height),
-                                  RocketProblem(veh, atmos, traj); kwargs...))
+                                  RocketProblem(vehicle, atmos, traj); kwargs...))
     end
 
     @printf("  ==> %d/%d solved\n", count(==("SCP_SOLVED"), statuses), length(statuses))
@@ -95,6 +102,9 @@ statusSweep()
 println("\nSame sweep, stopping one iteration earlier (ε_rel = 1e-2)")
 statusSweep(ε_rel=1e-2) # no effect, the convergence test cannot see the bad
                         # subproblem coming
+
+println("\nSame sweep with the old formulation: ‖T‖ ≤ 1, touchdown at burnout")
+statusSweep(vehicle=RocketParameters(Throttleable=true, FixedLandingTime=true))
 
 # `] add Clarabel` and uncomment: this solves every case ECOS fails on, though
 # it needs more SCP iterations to get there.

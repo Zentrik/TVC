@@ -47,8 +47,15 @@ function control(x, p, t)
     sol = p.solution[]
     t0 = p.t0[]
 
-    if t0 ≤ tₘ ≤ veh.BurnTime
-        time = (tₘ - t0) / (veh.BurnTime - t0)
+    tLand = sol.p[veh.id_tland] # touchdown is a decision variable, so the plan
+    # does not necessarily run all the way to burnout
+
+    if t0 ≤ tₘ ≤ tLand
+        time = (tₘ - t0) / (tLand - t0)
+        # The motor cannot throttle, so only the direction is ours to pick. The
+        # guidance problem is constrained to ‖T‖ = 1 (unless the vehicle is
+        # marked Throttleable), so this normalisation is a no-op rather than the
+        # plan's vertical channel being silently discarded.
         desired_tvc = normalize(sample(sol.xc, time)[veh.id_T])
         desired_roll = sample(sol.uc, time)[veh.id_roll]
     else
@@ -72,7 +79,12 @@ end
 #   MPC Controller
 #   ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
-function mpc!(integrator) # what if motor is spent, is this dealt with properly?
+const MinimumReplanTime = 0.5 # s of burn left. Below this the guidance has
+# essentially no authority left (see docs/mpc-feasibility.md), the horizon is a
+# handful of nodes, and `veh.Thrust` has run off the end of its table, so
+# re-planning is worse than flying the plan we already have.
+
+function mpc!(integrator)
     veh = integrator.p.veh
     atmos = integrator.p.atmos
 
@@ -85,27 +97,44 @@ function mpc!(integrator) # what if motor is spent, is this dealt with properly?
 
     # Only valid for continuous control
     tₘ = motorTime(integrator.t, integrator.p.MotorIgnitionTime[])
-    sol = p.solution[]
-    t0 = p.t0[]
+    sol = integrator.p.solution[]
+    t0 = integrator.p.t0[]
+
+    if tₘ > veh.BurnTime - MinimumReplanTime
+        return # motor spent, or nearly. Keep flying the last plan.
+    end
+
+    tLand = sol.p[veh.id_tland]
 
     if integrator.t >= integrator.p.MotorIgnitionTime[]
-        time = (tₘ - t0) / (veh.BurnTime - t0)
-        traj = RocketTrajectoryParameters(r0=r, v0=v, q0=quat, ω0=ω, T0=sample(sol.xc, time)[veh.id_T], Ṫ0=sample(sol.xc, time)[veh.id_Ṫ], t0=tₘ, MotorFired=true, PreviousTrajectoryState=sol.xc, PreviousTrajectoryInput=sol.uc, PreviousTrajectoryCurrentTime=time, UsePreviousTrajectory=true)
+        time = clamp((tₘ - t0) / (tLand - t0), 0., 1.)
+        traj = RocketTrajectoryParameters(r0=r, v0=v, q0=quat, ω0=ω, T0=sample(sol.xc, time)[veh.id_T], Ṫ0=sample(sol.xc, time)[veh.id_Ṫ], t0=tₘ, MotorFired=true, PreviousTrajectoryState=sol.xc, PreviousTrajectoryInput=sol.uc, PreviousTrajectoryCurrentTime=time, PreviousTrajectoryTLand=tLand, UsePreviousTrajectory=true)
     else
-        traj = RocketTrajectoryParameters(r0=r, v0=v, q0=quat, ω0=ω, PreviousTrajectoryState=sol.xc, PreviousTrajectoryInput=sol.uc, PreviousTrajectoryP=integrator.p.MotorIgnitionTime[] -integrator.t, UsePreviousTrajectory=true)
+        traj = RocketTrajectoryParameters(r0=r, v0=v, q0=quat, ω0=ω, PreviousTrajectoryState=sol.xc, PreviousTrajectoryInput=sol.uc, PreviousTrajectoryP=integrator.p.MotorIgnitionTime[] -integrator.t, PreviousTrajectoryTLand=tLand, UsePreviousTrajectory=true)
     end
 
     mdl = RocketProblem(veh, atmos, traj)
 
     println("\n", traj, "\n")
 
-    tmpSolution = solveProblem(mdl)
+    # A subproblem the conic solver could not solve is re-discretised before its
+    # status is checked, which throws SingularException out of PTR.solve. One
+    # bad tick should not take the whole simulation down with it.
+    tmpSolution = try
+        solveProblem(mdl)
+    catch e
+        println("guidance threw ", sprint(showerror, e), ", keeping previous plan")
+        nothing
+    end
 
-    println(tmpSolution.status)
+    if !isnothing(tmpSolution)
+        println(tmpSolution.status)
+    end
 
-    if tmpSolution.status == "SCP_SOLVED"
-        integrator.p.solution[] = tmpSolution  
-        
+    if !isnothing(tmpSolution) && tmpSolution.status == "SCP_SOLVED" &&
+       all(isfinite, tmpSolution.xd)
+        integrator.p.solution[] = tmpSolution
+
         if !traj.MotorFired
             integrator.p.MotorIgnitionTime[] = integrator.t + integrator.p.solution[].p[veh.id_tcoast] # update motor ignition time as long as motor hasn't been fired
             # integrator.p.t0[] = 0. # unnecessary
@@ -167,7 +196,8 @@ cbs = CallbackSet(cb, mpccb)#, scb);
 sol = DifferentialEquations.solve(prob, callback=cbs)
 # sol = DifferentialEquations.solve(prob, reltol=1e-8, abstol=1e-8, callback=cbs)
 
-println("Estimated Coast time (s): ", solution.p[1])
+println("Estimated Coast time (s): ", solution.p[veh.id_tcoast])
+println("Planned touchdown at motor time (s): ", solution.p[veh.id_tland], " of ", veh.BurnTime)
 println("Coast time (s): ", sol.prob.p.MotorIgnitionTime[])
 println("Burn Time (s) ", sol.t[end] - sol.prob.p.MotorIgnitionTime[])
 
@@ -175,7 +205,7 @@ println("Estimated Impact Velocity Magnitude (m/s): ", solution.cost^0.5)
 println("True Impact Velocity Magnitude (m/s): ", norm(sol.u[end][mdl.veh.id_v] - mdl.traj.vN))
 
 Plots.plot(sol, idxs=veh.id_r)
-Plots.plot!(sol.prob.p.MotorIgnitionTime .+ sol.prob.p.traj.t0 .+ (mdl.veh.BurnTime - sol.prob.p.traj.t0) * solution.td, solution.xd[mdl.veh.id_r, :]')
+Plots.plot!(sol.prob.p.MotorIgnitionTime .+ sol.prob.p.traj.t0 .+ (solution.p[veh.id_tland] - sol.prob.p.traj.t0) * solution.td, solution.xd[mdl.veh.id_r, :]')
 
 Plots.plot(sol, idxs=4:6)
 Plots.plot(sol, idxs=7:10)

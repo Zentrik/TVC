@@ -27,6 +27,16 @@ export RocketParameters
     BurnTime = 3.45
     InertiaTensor::M = Diagonal([0.0826975856, 0.0826975856, 2.4778e-04]) # in body principal axis basis.
 
+    # A solid motor cannot throttle. Set this to true to let the guidance
+    # problem choose ‖T‖ ∈ [0, 1] anyway, which is what it used to do.
+    Throttleable::Bool = false
+
+    # Set this to true to force touchdown to happen exactly at burnout, which is
+    # what the guidance problem used to require. With no throttle that leaves it
+    # with almost nothing to steer the terminal altitude constraint with, so by
+    # default the touchdown time is a decision variable bounded by BurnTime.
+    FixedLandingTime::Bool = false
+
     Mass::Any = Mass
     Thrust::Any = Thrust
     Acceleration::Any = Acceleration
@@ -45,6 +55,7 @@ export RocketParameters
     id_roll::UnitRange{I} = 4:4
 
     id_tcoast::I = 1
+    id_tland::I = 2 # motor time at touchdown, see FixedLandingTime
 
     # nx::I = 19
     # nu::I = 4

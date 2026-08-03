@@ -6,8 +6,9 @@ frequently fails to return a trajectory when it is re-solved from the current
 state, as [`Examples/MPC_Simulation.jl`](../Examples/MPC_Simulation.jl) does
 every 0.25 s.
 
-Everything below was reproduced with `ECOS`, `PTR`, and the parameters in
-[`src/Guidance/run.jl`](../src/Guidance/run.jl).
+Everything below was reproduced with `PTR` and the parameters in
+[`src/Guidance/run.jl`](../src/Guidance/run.jl), with `ECOS` where §1 talks
+about the original behaviour and `Clarabel` afterwards.
 [`Examples/FeasibilitySweep.jl`](../Examples/FeasibilitySweep.jl) reruns the
 experiments.
 
@@ -28,6 +29,11 @@ call for completely different fixes.
 2. **The problem is nonetheless nearly uncontrollable in the vertical axis
    once the motor is lit**, so even when it does solve, the MPC has almost no
    authority to correct a disturbance. This is a formulation issue, not a bug.
+3. **`‖T‖ ≤ 1` was a lossy relaxation, not a lossless convexification.** The
+   optimiser really does throttle down — to 89.5% on one measured case — so the
+   plans were not flyable by a solid motor. Pinning `‖T‖ = 1` costs a lot of
+   tractability, which is bought back by letting the touchdown time float
+   instead of fixing it at burnout.
 
 Plus a handful of concrete bugs (listed at the end) that make (1) much worse.
 
@@ -210,50 +216,140 @@ and, more importantly, what is left of it partway through the burn:
 | velocity window | 5.85 m/s | 4.09 m/s | 2.68 m/s | 1.57 m/s | 0.77 m/s | 0.26 m/s | 0.03 m/s |
 
 So a re-solve 2 s into the burn can absorb under a metre of altitude error, and
-one 2.5 s in can absorb about 30 cm. Two things guarantee that much error:
+one 2.5 s in can absorb about 30 cm.
 
-* **The guidance model has no aerodynamics at all**, while the simulation runs
-  with `Aero = true`. At 12 m/s the axial force is ~0.25 N, ~2.4% of weight,
-  which is ~0.8 m/s and >1 m of altitude over a burn — larger than the entire
-  correction budget from about 2 s in. The airframe has no fins, so the normal
-  force also produces a pitching moment the guidance never sees.
-* **The controller does not fly the plan.** `Examples/MPC_Simulation.jl` does
+Note what those numbers are measuring, though: they are the authority of a
+throttle the vehicle **does not have**. The motor is solid. Aerodynamics are
+deliberately left out of the guidance model (see below), so `Aero = true` in the
+simulation is an unmodelled disturbance the guidance has to absorb — at 12 m/s
+the axial force is ~0.25 N, ~2.4% of weight, worth ~0.8 m/s and >1 m of altitude
+over a burn. That is larger than the entire throttle budget from about 2 s into
+the burn, and larger still than the real budget without a throttle.
 
-  ```julia
-  desired_tvc = normalize(sample(sol.xc, time)[veh.id_T])   # magnitude thrown away
-  ...
-  Thrust = desired_tvc * veh.Thrust(tₘ)                     # always 100%
-  ```
-
-  so whenever the guidance plans `‖T‖ < 1` the vehicle flies full thrust
-  instead. That is *the* vertical control channel being discarded, and the
-  error it injects compounds every 0.25 s.
-
-This is also a divergence from the formulation in the paper
+This is a divergence from the formulation in the paper
 ([`Paper/Guidance.tex`](../../Paper/Guidance.tex)), which uses a unit thrust
-direction (no throttle at all, correct for a solid motor) and a **free**
-touchdown time `b` with `b ≥ burn time`. Fixing touchdown at burnout and adding
-a throttle the vehicle does not have is what produced the rigidity.
+direction (correct for a solid motor) and a **free** touchdown time `b` with
+`b ≥ burn time`. Fixing touchdown at burnout and adding a throttle instead is
+what produced the rigidity — see §3.
 
 ### Suggested changes
 
 * **Make the touchdown time free.** Add a second parameter `t_land` and scale
   the dynamics by it, exactly as the coast time is handled now, with
   `t_land ≤ BurnTime`. This restores the free variable the paper's formulation
-  has and gives the mid-burn re-solve something to move.
-* **Either honour the throttle or remove it.** If the motor cannot throttle,
-  constrain `‖T‖ = 1` (linearised about the reference: `T_ref·T = 1`) and let
-  vehicle tilt be the vertical knob. If a partial throttle is genuinely
-  available, apply the planned magnitude in the simulation instead of
-  normalising it.
-* **Put the drag term in the guidance dynamics**, at least the axial component.
-  It is a smooth function of the state and cheap to linearise, and it is
-  currently larger than the correction authority it is competing with.
+  has, and is the only thing that gives a mid-burn re-solve real authority once
+  the throttle is gone.
 * **Fall back gracefully.** As `t0 → BurnTime` the horizon and the authority
   both go to zero and re-solving is pointless. Stop re-planning below some
   remaining-burn threshold and fly the last good plan.
 
-## 3. Bugs found
+Aerodynamics stay out of the guidance model on purpose — the formulation in
+`Utils/Aerodynamics.jl` is not trusted, and in the simulation it is mostly there
+to inject a disturbance. The consequence is just that the drag figure above is
+part of the error budget rather than something the planner can anticipate.
+
+## 3. `‖T‖ ≤ 1` is not a lossless relaxation of `‖T‖ = 1` here
+
+The motor is solid, so the thrust magnitude is not a control — the vehicle flies
+`‖T‖ = 1` whatever the plan says. The problem as written only asked for
+`‖T‖ ≤ 1`.
+
+Relaxing a nonconvex thrust bound like that is a rigorous and well known
+technique — *lossless convexification*, from the GFOLD line of work (Açıkmeşe &
+Ploen 2007; Blackmore, Açıkmeşe & Scharf 2010). The construction there is
+
+```
+minimise  ∫ Γ dt
+s.t.      ‖T‖ ≤ Γ,   ρ_min ≤ Γ ≤ ρ_max
+```
+
+with a **slack variable Γ** that replaces `‖T‖` everywhere it appears in the cost
+and in the mass dynamics. The theorem is that the optimum satisfies `‖T‖ = Γ`
+pointwise, so the relaxed convex problem solves the original nonconvex one
+exactly. It is also, as expected, much more tractable than the nonconvex
+problem — that part is real here too, see the numbers below.
+
+The hypothesis doing the work is that **Γ, not `‖T‖`, is what the cost sees**.
+Minimising fuel drives Γ down until it meets `‖T‖`, and only then does
+`ρ_min ≤ Γ` bite. This problem has none of that structure:
+
+* there is no slack variable and no lower bound — just `‖T‖ ≤ 1`;
+* the cost is `‖v_N − v_N*‖²`, which does not involve `‖T‖` at all, so nothing
+  pushes the solution onto the boundary of the cone;
+* the results are proved for 3-DoF translational dynamics with the thrust vector
+  as the direct control. Here `T` is a *state*, rate limited by `‖Ṫ‖ ≤ 5 °/s` and
+  `‖T̈‖ ≤ 10 °/s²`, and it also drives the attitude dynamics.
+
+So it is a plain relaxation, and whether it happens to be tight is an empirical
+question. It is easy to check: if the relaxation were lossless the two problems
+would have the same optimal cost, and the relaxed solution would come out with
+`‖T‖ = 1` anyway.
+
+Taking `h0 = 18 m` (Clarabel, touchdown fixed at burnout in both cases):
+
+| | optimal `J` | `min‖T‖` | touchdown speed |
+|---|---|---|---|
+| `‖T‖ ≤ 1` (relaxed) | `6.98e-06` | **0.8952** | 0.0004 m/s |
+| `‖T‖ = 1` (real vehicle) | `6.66e-04` | 1.0000 | 0.026 m/s |
+
+The relaxed optimum throttles down to **89.5%** and buys a two-orders-of-magnitude
+better cost with it. If the relaxation were lossless those two rows would agree.
+They do not, so `‖T‖ ≤ 1` is solving a strictly easier problem than the one the
+vehicle can fly — and the extra freedom is exactly the throttle a solid motor
+does not have.
+
+The relaxation *is* much more tractable, as expected — that part of the
+intuition is right, and it is worth being explicit about the size of the effect:
+
+| ignition altitude sweep (21 cases) | ECOS | Clarabel |
+|---|---|---|
+| `‖T‖ ≤ 1`, touchdown at burnout | 12/21 | 21/21, 5–47 SCP iterations |
+| `‖T‖ = 1`, touchdown at burnout | 6/21 | solves, but hits the 50 iteration cap |
+
+So the relaxation was buying real tractability. It just was not free.
+
+`Examples/FeasibilitySweep.jl` prints `min‖T‖` for exactly this reason — if the
+relaxed solution comes back with `min‖T‖ < 1` it is planning a throttle the
+vehicle does not have, and the simulation's `normalize(...)` will quietly throw
+that part of the plan away.
+
+### What changed
+
+`RocketParameters` gained two switches, both defaulting to the physical vehicle:
+
+* `Throttleable = false` adds `‖T‖ ≥ 1` as a nonconvex path constraint,
+  linearised about the reference by the SCP algorithm (`s(x) = 1 − T·T ≤ 0`) and
+  relaxed by a penalised virtual control, so it can never make a subproblem
+  infeasible. Together with the existing cone this pins `‖T‖ = 1`. Set it to
+  `true` to get the old relaxation back.
+* `FixedLandingTime = false` promotes the touchdown time to a decision variable
+  `p[veh.id_tland] ∈ [t0 + MinimumHorizon, BurnTime]`, and the trajectory is
+  scaled to that horizon rather than to burnout.
+
+The second is what pays for the first. Requiring touchdown *exactly* at burnout
+was only tractable because the throttle was there to absorb the terminal
+altitude constraint; with the throttle gone the constraint has nothing to work
+with, which is what §2 is about. A free touchdown time is the knob the paper's
+own formulation has, it is physically meaningful, and unlike the throttle the
+vehicle can actually deliver it.
+
+On the nominal ignition state the two switches together give
+
+```
+|T|=1, free t_land   SCP_SOLVED   t_coast=1.327  t_land=3.450
+                                  min‖T‖=1.0000  r_end=[32.6, -13.44, 0.0]  |v_end|=0.228 m/s
+```
+
+against 0.52 m/s for the old relaxed-throttle, fixed-touchdown problem — a
+better landing, and one the vehicle can actually fly. Note that the optimiser
+picked `t_land = BurnTime` here: on the nominal trajectory the freedom is not
+needed, it is there for when a disturbance means the old problem would have had
+no answer at all.
+
+**Not yet measured**: a full ignition-altitude sweep and a mid-burn restart
+sweep with both switches on. `Examples/FeasibilitySweep.jl` runs them.
+
+## 4. Bugs found
 
 ### `slerp_quat` ignores its interpolation parameter (fixed)
 
