@@ -1,7 +1,8 @@
 using LinearAlgebra, Parameters, StaticArrays
 using ..Utils
+import TVC: motorTime
 
-export RocketTrajectoryParameters, RocketProblem
+export RocketTrajectoryParameters, RocketProblem, horizon
 
 # ..:: Data structures ::..
 
@@ -22,7 +23,8 @@ export RocketTrajectoryParameters, RocketProblem
     PreviousTrajectoryState::ContinuousTimeTrajectory = ContinuousTimeTrajectory([0], [0], :linear)
     PreviousTrajectoryInput::ContinuousTimeTrajectory = ContinuousTimeTrajectory([0], [0], :linear)
     PreviousTrajectoryCurrentTime::R = 0. # Current time relative to previous trajectory, i.e. sample(, current time) gives the previous trajectory's solution at the current time.
-    PreviousTrajectoryP:: R = 0. # Best estimate for p relative to current time.
+    PreviousTrajectoryP:: R = 0. # Best estimate for t_coast relative to current time.
+    PreviousTrajectoryTLand::R = 3.45 # Best estimate for the touchdown motor time, i.e. the previous solution's p[veh.id_tland]. Defaults to the F15 burn time.
     UsePreviousTrajectory::Bool = false
 
     rN = @SVector zeros(3) # Final Position
@@ -39,3 +41,18 @@ end
     atmos::Atmosphere = Atmosphere() # The environment
     traj::RocketTrajectoryParameters = RocketTrajectoryParameters() # The trajectory
 end
+
+"""
+    horizon(p, mdl)
+
+How much powered flight the trajectory covers: the motor time at touchdown,
+which is a decision variable, less the motor time we are planning from.
+"""
+horizon(p, mdl::RocketProblem) = p[mdl.veh.id_tland] - mdl.traj.t0
+
+"""
+    motorTime(τ, p, mdl)
+
+Motor time at normalised trajectory time `τ ∈ [0, 1]`.
+"""
+motorTime(τ, p, mdl::RocketProblem) = mdl.traj.t0 + τ * horizon(p, mdl)

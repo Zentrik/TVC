@@ -4,6 +4,7 @@ authors = ["Zentrik <Zentrik@users.noreply.github.com>"]
 version = "0.1.0"
 
 [deps]
+Clarabel = "61c947e1-3e6d-4ee4-985a-eec8c727bd6e"
 ControlSystems = "a6e380b2-a6ca-5380-bf3e-84a91bcd477e"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"

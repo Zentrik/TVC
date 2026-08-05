@@ -21,15 +21,12 @@ export define_problem!
 function define_problem!(pbm::TrajectoryProblem, algo::Symbol)::Nothing
     set_dims!(pbm)
     set_scale!(pbm)
-    set_cost!(pbm)
+    set_cost!(pbm, algo)
     set_dynamics!(pbm)
     set_integration_action(pbm)
     set_convex_constraints!(pbm)
+    set_nonconvex_constraints!(pbm, algo)
     set_bcs!(pbm)
-
-    if algo == :scvx
-        problem_set_s!(pbm, algo, (t, k, x, u, p, pbm) -> [0])
-    end
 
     set_guess!(pbm)
 
@@ -38,7 +35,7 @@ end
 
 function set_dims!(pbm::TrajectoryProblem)::Nothing
 
-    problem_set_dims!(pbm, 19, 4, 1)
+    problem_set_dims!(pbm, 19, 4, 2) # parameters are [t_coast; t_land]
 
     return nothing
 end
@@ -60,7 +57,7 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     advise!(pbm, :state, 10, (-1.0, 1.0))
     advise!(pbm, :state, 11, (-10.0, 10.0))
     advise!(pbm, :state, 12, (-10.0, 10.0))
-    advise!(pbm, :state, 13, (-10.0, 00.0))
+    advise!(pbm, :state, 13, (-10.0, 10.0)) # was (-10.0, 0.0), which is a typo: ω_z is not sign definite
 
     advise!(pbm, :state, 14, (-1.0, 1.0))
     advise!(pbm, :state, 15, (-1.0, 1.0))
@@ -73,10 +70,14 @@ function set_scale!(pbm::TrajectoryProblem)::Nothing #VERY IMPORTANT
     advise!(pbm, :input, 1, (-deg2rad(10), deg2rad(10)))
     advise!(pbm, :input, 2, (-deg2rad(10), deg2rad(10)))
     advise!(pbm, :input, 3, (-deg2rad(10), deg2rad(10)))
-    advise!(pbm, :input, 4, (-1.0, 1.0))
+    advise!(pbm, :input, 4, (-0.1, 0.1)) # was (-1, 1), while the roll torque
+    # constraint is |u4| <= 0.1, so the scaled variable only ever used a tenth
+    # of its range. Just a mismatch worth fixing; it is not what drives the roll
+    # rate (see docs/mpc-feasibility.md).
 
     # Parameters
     advise!(pbm, :parameter, 1, (0.0, 10.0))
+    advise!(pbm, :parameter, 2, (0.0, pbm.mdl.veh.BurnTime + pbm.mdl.veh.MaxBallisticTime))
 
     return nothing
 end
@@ -103,13 +104,13 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
         atmos = pbm.mdl.atmos
 
         if traj.UsePreviousTrajectory
-            p = [traj.PreviousTrajectoryP]
+            p = [traj.PreviousTrajectoryP; traj.PreviousTrajectoryTLand]
 
             SampleTimes = collect(range(traj.PreviousTrajectoryCurrentTime, 1, N))
             x = mapreduce(t -> sample(traj.PreviousTrajectoryState, t), hcat, SampleTimes)
             u = mapreduce(t -> sample(traj.PreviousTrajectoryInput, t), hcat, SampleTimes)
         else
-            p = [0.0] # ignite immediately.
+            p = [0.0; veh.BurnTime] # ignite immediately, land at burnout.
 
             # motorTimeRemaining = veh.BurnTime - traj.t0 # how much motor time remaining
 
@@ -127,10 +128,17 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
             
             u = straightline_interpolate([0; 0; 0; 0], [0; 0; 0; 0], N)
             
+            # Roll is left at whatever q0 has, only the tilt is interpolated out.
+            # This has to be normalised: [q0[1]; qN[2:3]; q0[4]] has norm < 1
+            # whenever the rocket is tilted, and a non unit reference quaternion
+            # makes the linearised dynamics inconsistent (see the TODO at the
+            # top of this file).
+            quatN = normalize([traj.q0[1]; traj.qN[2:3]; traj.q0[4]])
+
             for k = 1:N
                 mix = (k - 1) / (N - 1)
-                
-                x[veh.id_quat, k] = slerp_quat(traj.q0, [traj.q0[1]; traj.qN[2:3]; traj.q0[4]], mix)
+
+                x[veh.id_quat, k] = slerp_quat(traj.q0, quatN, mix)
             end
         end
 
@@ -140,11 +148,27 @@ function set_guess!(pbm::TrajectoryProblem)::Nothing
     return nothing
 end
     
-function set_cost!(pbm::TrajectoryProblem)::Nothing
+function set_cost!(pbm::TrajectoryProblem, algo::Symbol)::Nothing
     problem_set_terminal_cost!(
         pbm, (x, p, pbm) -> dot(x[pbm.mdl.veh.id_v] - pbm.mdl.traj.vN, x[pbm.mdl.veh.id_v] - pbm.mdl.traj.vN)
         # 0 # use for feasibility testing
     )
+
+    # Quadratic running cost on the input, each channel normalised by its own
+    # limit so the two contribute comparably. Without this the inputs are free:
+    # nothing in the problem prefers a small one, so they end up wherever the
+    # solver happens to stop, and the gimbal command sits saturated.
+    #
+    # Note this does not fix the roll rate, which was the original motivation —
+    # max|u₄| stays at 1e-4 to 1e-3 across four orders of magnitude of weight.
+    # See docs/mpc-feasibility.md.
+    problem_set_running_cost!(
+        pbm, algo, (t, k, x, u, p, pbm) -> begin
+            veh = pbm.mdl.veh
+
+            veh.InputCostWeight * (dot(u[veh.id_T̈], u[veh.id_T̈]) / deg2rad(10)^2 +
+                                   dot(u[veh.id_roll], u[veh.id_roll]) / 0.1^2)
+        end)
 
     return nothing
 end
@@ -194,17 +218,37 @@ function set_dynamics!(pbm::TrajectoryProblem)::Nothing
         return B
     end
 
-    # Dynamics
+    # ∂f/∂t. `Thrust`, `Mass` and `CG` are interpolated tables, so this is done
+    # numerically rather than by differentiating through them. It is only needed
+    # for df/dp: stretching the horizon slides every node along the thrust curve
+    # as well as changing dt/dτ.
+    function ḟ_t(x, u, t, pbm, h=1e-5)
+        return (f_t(x, u, t + h, pbm) - f_t(x, u, t - h, pbm)) / (2 * h)
+    end
+
+    # Dynamics, in normalised time τ ∈ [0, 1]. The horizon is t_land - t0, where
+    # t_land is a decision variable, so dt/dτ = t_land - t0 and every derivative
+    # below picks up that factor.
     problem_set_dynamics!(
         pbm,
         # f
-        (t, k, x, u, p, pbm) -> f_t(x, u, motorTime(t, pbm.mdl), pbm) * (pbm.mdl.veh.BurnTime - pbm.mdl.traj.t0),
+        (t, k, x, u, p, pbm) -> f_t(x, u, motorTime(t, p, pbm.mdl), pbm) * horizon(p, pbm.mdl),
         # df/dx
-        (t, k, x, u, p, pbm) -> A_t(x, u, motorTime(t, pbm.mdl), pbm.mdl.veh) * (pbm.mdl.veh.BurnTime - pbm.mdl.traj.t0),
+        (t, k, x, u, p, pbm) -> A_t(x, u, motorTime(t, p, pbm.mdl), pbm.mdl.veh) * horizon(p, pbm.mdl),
         # df/du
-        (t, k, x, u, p, pbm) -> B_t(x, u, motorTime(t, pbm.mdl), pbm.mdl.veh) * (pbm.mdl.veh.BurnTime  - pbm.mdl.traj.t0),
+        (t, k, x, u, p, pbm) -> B_t(x, u, motorTime(t, p, pbm.mdl), pbm.mdl.veh) * horizon(p, pbm.mdl),
         # df/dp
-        (t, k, x, u, p, pbm) -> zeros(pbm.nx, pbm.np) * (pbm.mdl.veh.BurnTime  - pbm.mdl.traj.t0)
+        (t, k, x, u, p, pbm) -> begin
+            veh = pbm.mdl.veh
+            tₘ = motorTime(t, p, pbm.mdl)
+
+            F = zeros(pbm.nx, pbm.np)
+            # d/dt_land of f(x, u, t0 + τ (t_land - t0)) * (t_land - t0)
+            F[:, veh.id_tland] = f_t(x, u, tₘ, pbm) +
+                                 horizon(p, pbm.mdl) * t * ḟ_t(x, u, tₘ, pbm)
+
+            F
+        end
     )
 
     return nothing
@@ -216,7 +260,13 @@ function set_integration_action(pbm::TrajectoryProblem)::Nothing
     problem_set_integration_action!(
         pbm, pbm.mdl.veh.id_quat,
         (q, pbm) -> begin
-            qn = q / norm(q)
+            if norm(q) ≈ 0
+                print(q)
+                qn = q
+            else
+                qn = q / norm(q)
+            end
+            
             return qn
     end)
 
@@ -350,6 +400,28 @@ function set_bcs!(pbm::TrajectoryProblem)::Nothing
         # )
 end
 
+"""Shortest powered horizon the guidance will plan over, in seconds."""
+const MinimumHorizon = 0.05
+
+"""
+    fixParameter!(ocp, pbm, i, value)
+
+Pin element `i` of the problem's parameter vector to the physical value `value`.
+
+Two things to be careful of. The parameter block is created as a vector, so JuMP
+names its elements `p[1]`, `p[2]`, ... — asking for `"p"` gets you `nothing` as
+soon as there is more than one of them. And the JuMP variable is the *scaled*
+parameter, `p = S p̂ + c` with `S`, `c` taken from the bounds given to
+`problem_advise_scale!`, so the value has to be scaled to match.
+"""
+function fixParameter!(ocp, pbm::TrajectoryProblem, i::Integer, value::Real)
+    lower, upper = pbm.prg[i]
+
+    fix(variable_by_name(jump_model(ocp), "p[$i]"), (value - lower) / (upper - lower))
+
+    return nothing
+end
+
 function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
     # Convex State Constraints
     problem_set_X!(
@@ -369,7 +441,8 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                 #         local t_coast = arg[1]
                 #         t_coast
                 #     end)
-                fix(variable_by_name(jump_model(ocp), "p"), 0.) # need to change if p has more than one element.
+                # `p` is a vector, so JuMP names its elements p[1], p[2], ...
+                fixParameter!(ocp, pbm, veh.id_tcoast, 0.)
                 # Probably doesn't matter, Gurobi seems to be able to equate the two above in its presolve, ECOS doesn't but it returns p on the order of 1e-8 or below with first constraint.
 
                 # @perturb_fix p[veh.id_tcoast] # fix to initial guess which is 0? # doesn't seem to work well
@@ -381,11 +454,46 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
                     end)
             end
 
+            if veh.FixedLandingTime
+                fixParameter!(ocp, pbm, veh.id_tland, veh.BurnTime)
+            else
+                # BurnTime ≤ t_land ≤ BurnTime + MaxBallisticTime.
+                #
+                # Touchdown must not happen before the motor is spent. Thrust to
+                # weight is about 1.35 for most of the burn, so a rocket that
+                # reaches the ground while still thrusting bounces and flies
+                # again — it is a crash, not a landing, and the paper counts it
+                # as a failure. `height >= 0` at every node is what keeps the
+                # trajectory above the ground until then.
+                #
+                # Past BurnTime `veh.Thrust` is 0 and `veh.Mass` and `veh.CG` are
+                # flat, so the same dynamics carry on as an unpowered ballistic
+                # fall with no further modelling needed. That tail is the point:
+                # it turns "be exactly at the ground the instant the motor cuts
+                # out" into "be above the ground at cutout and fall the rest of
+                # the way", which is a condition an off nominal state can
+                # actually meet.
+                @add_constraint(
+                    ocp, NONPOS, "t_land >= BurnTime", (p[veh.id_tland],), begin
+                        local t_land = arg[1]
+                        # `max` so the horizon stays positive even if we are
+                        # somehow re-planning past burnout.
+                        max(veh.BurnTime, traj.t0 + MinimumHorizon) - t_land
+                    end)
+
+                @add_constraint(
+                    ocp, NONPOS, "t_land <= BurnTime + max ballistic time",
+                    (p[veh.id_tland],), begin
+                        local t_land = arg[1]
+                        t_land - (veh.BurnTime + veh.MaxBallisticTime)
+                    end)
+            end
+
             @add_constraint(
                 ocp, SOC, "Thrust Magnitude <= Max", (x[veh.id_T],), begin # we have say thrust <= 1, as we want it normalised
                     local Thrust = arg[1]
                     [1; Thrust]
-                end)
+                end) # if the motor cannot throttle this is only half of ‖T‖ = 1, see set_nonconvex_constraints!
 
             @add_constraint(
                 ocp, SOC, "Thrust Gimal angle <= delta_max", (x[veh.id_T],), begin
@@ -402,11 +510,15 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
             @add_constraint(
             ocp, SOC, "TVC angular velocity <= Max", (x[veh.id_Ṫ],), (u) -> [deg2rad(5); u]) # Angular velocity is r × v / ||r||², v = u, assume u is ⊥ r and ||r||² = 1, so angular velocity is v = u.
 
-        # @add_constraint(
-        #     ocp, SOC, "|w| < w_max", (x[11:13],), begin
-        #         local w = arg[1]
-        #         [pi / 2; w]
-        #     end)
+            if k > 1 # node 1 is pinned to the measured state by the initial
+                # condition, so bounding it here would fight the measurement
+                # rather than shape the trajectory.
+                @add_constraint(
+                    ocp, SOC, "|w| <= w_max", (x[veh.id_ω],), begin
+                        local ω = arg[1]
+                        [veh.MaxAngularVelocity; ω]
+                    end)
+            end
     end)
 
     # Convex Input Constraints
@@ -424,7 +536,57 @@ function set_convex_constraints!(pbm::TrajectoryProblem)::Nothing
             @add_constraint(
                 ocp, SOC, "TVC Acceleration <= Max", (u[veh.id_T̈],), begin
                     local u = arg[1]
-                    [deg2rad(10); u] # Angular Acceleration is r × a / ||r||², a = u, assume u is ⊥ r and ||r||² = 1, so angular acceleration is a = u. 
+                    [deg2rad(10); u] # Angular Acceleration is r × a / ||r||², a = u, assume u is ⊥ r and ||r||² = 1, so angular acceleration is a = u.
                 end)
-    end) 
+    end)
+end
+
+"""
+    set_nonconvex_constraints!(pbm, algo)
+
+A solid motor cannot throttle, so the thrust magnitude is not a control: ‖T‖ = 1
+for the whole burn. `set_convex_constraints!` already imposes ‖T‖ ≤ 1 as a
+second order cone; the other half, ‖T‖ ≥ 1, is nonconvex, so it is handed to the
+SCP algorithm as `s(x) = 1 - T ⋅ T ≤ 0` and linearised about the reference
+trajectory. Like the dynamics it is relaxed with a (penalised) virtual control,
+so it can never make a subproblem infeasible.
+
+Note that the "TVC angular velocity" and "TVC Acceleration" constraints only
+mean what their names say when ‖T‖ = 1 — they bound ‖Ṫ‖ and ‖T̈‖, which are the
+gimbal rate and angular acceleration only for a unit thrust vector.
+
+Set `RocketParameters(Throttleable=true)` to drop this and let the optimiser
+pick ‖T‖ ∈ [0, 1] instead, which is what this problem used to do.
+"""
+function set_nonconvex_constraints!(pbm::TrajectoryProblem, algo::Symbol)::Nothing
+    if pbm.mdl.veh.Throttleable
+        if algo == :scvx # SCvx wants an s even when there is nothing to enforce
+            problem_set_s!(pbm, algo, (t, k, x, u, p, pbm) -> [0])
+        end
+
+        return nothing
+    end
+
+    problem_set_s!(
+        pbm, algo,
+        # s
+        (t, k, x, u, p, pbm) -> begin
+            local T = x[pbm.mdl.veh.id_T]
+
+            [1 - dot(T, T)]
+        end,
+        # ds/dx
+        (t, k, x, u, p, pbm) -> begin
+            local C = zeros(1, pbm.nx)
+            C[1, pbm.mdl.veh.id_T] = -2 * x[pbm.mdl.veh.id_T]
+
+            C
+        end,
+        # ds/du
+        (t, k, x, u, p, pbm) -> zeros(1, pbm.nu),
+        # ds/dp
+        (t, k, x, u, p, pbm) -> zeros(1, pbm.np),
+    )
+
+    return nothing
 end
